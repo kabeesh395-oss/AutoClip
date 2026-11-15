@@ -170,7 +170,14 @@ def _now_ist() -> datetime:
 
 @app.get("/")
 def home():
-    return FileResponse(STATIC / "index.html")
+    return FileResponse(
+        STATIC / "index.html",
+        headers={
+            "Cache-Control": "no-cache, no-store, must-revalidate",
+            "Pragma": "no-cache",
+            "Expires": "0",
+        },
+    )
 
 
 def _get_local_ip() -> str:
