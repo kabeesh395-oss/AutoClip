@@ -634,7 +634,7 @@
         } else {
           if (dot) dot.className = 'w-2 h-2 rounded-full bg-warning';
           if (text) text.textContent = data.configured ? 'Not Connected' : 'No Secrets';
-          if (details) details.textContent = 'OAuth secrets required in client_secrets.json';
+          if (details) details.textContent = data.configured ? 'Google OAuth Configured • Ready to Connect' : 'OAuth secrets required in client_secrets.json';
           if (btn) {
             btn.textContent = 'Connect';
             btn.disabled = false;
