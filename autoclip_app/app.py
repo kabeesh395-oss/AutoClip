@@ -3,6 +3,7 @@ from __future__ import annotations
 import io
 import json
 import logging
+import os
 import re
 import shutil
 import socket
@@ -48,12 +49,28 @@ DATA = ROOT / "data"
 UPLOADS = DATA / "uploads"
 OUTPUTS = DATA / "outputs"
 STATIC = Path(__file__).parent / "static"
-SCHEDULE_DB = DATA / "autoclip.sqlite3"
+SCHEDULE_DB = Path(os.getenv("AUTOCLIP_DB_PATH", str(DATA / "autoclip.sqlite3")))
 LOG_FILE = DATA / "server.log"
 IST = timezone(timedelta(hours=5, minutes=30))
 for folder in (UPLOADS, OUTPUTS):
     folder.mkdir(parents=True, exist_ok=True)
 init_batch_tables()
+
+
+def _output_rel_url(path_val: str | Path | None) -> str:
+    if not path_val:
+        return ""
+    p = Path(path_val)
+    if not p.is_absolute():
+        p = (ROOT / p).resolve()
+    else:
+        p = p.resolve()
+    outputs_res = OUTPUTS.resolve()
+    try:
+        rel = p.relative_to(outputs_res).as_posix()
+        return f"/outputs/{rel}"
+    except ValueError:
+        return f"/outputs/{p.name}"
 
 # Configure persistent file logger
 logger = logging.getLogger("autoclip")
@@ -776,17 +793,17 @@ def api_get_batch_clips(batch_id: str):
             clip_copy["improvement_tips"] = []
         if c.get("output_path"):
             p = Path(c["output_path"])
-            clip_copy["video_url"] = f"/outputs/{p.parent.parent.name}/{p.parent.name}/{p.name}"
+            clip_copy["video_url"] = _output_rel_url(p)
             srt_p = p.with_suffix(".srt")
             if srt_p.exists():
-                clip_copy["subtitle_url"] = f"/outputs/{p.parent.parent.name}/{p.parent.name}/{srt_p.name}"
+                clip_copy["subtitle_url"] = _output_rel_url(srt_p)
                 try:
                     clip_copy["subtitles_srt"] = srt_p.read_text(encoding="utf-8")
                 except Exception:
                     clip_copy["subtitles_srt"] = ""
             ass_p = p.with_suffix(".ass")
             if ass_p.exists():
-                clip_copy["ass_url"] = f"/outputs/{p.parent.parent.name}/{p.parent.name}/{ass_p.name}"
+                clip_copy["ass_url"] = _output_rel_url(ass_p)
         formatted_clips.append(clip_copy)
     return {"clips": formatted_clips, "count": len(formatted_clips)}
 
@@ -820,17 +837,17 @@ def api_get_clip(clip_id: str):
             clip["improvement_tips"] = []
         if clip.get("output_path"):
             p = Path(clip["output_path"])
-            clip["video_url"] = f"/outputs/{p.parent.parent.name}/{p.parent.name}/{p.name}"
+            clip["video_url"] = _output_rel_url(p)
             srt_p = p.with_suffix(".srt")
             if srt_p.exists():
-                clip["subtitle_url"] = f"/outputs/{p.parent.parent.name}/{p.parent.name}/{srt_p.name}"
+                clip["subtitle_url"] = _output_rel_url(srt_p)
                 try:
                     clip["subtitles_srt"] = srt_p.read_text(encoding="utf-8")
                 except Exception:
                     clip["subtitles_srt"] = ""
             ass_p = p.with_suffix(".ass")
             if ass_p.exists():
-                clip["ass_url"] = f"/outputs/{p.parent.parent.name}/{p.parent.name}/{ass_p.name}"
+                clip["ass_url"] = _output_rel_url(ass_p)
         return clip
 
 
@@ -896,7 +913,7 @@ def api_rerender_clip(clip_id: str, payload: dict = Body(default={})):
         "clip_id": clip_id,
         "layout": layout,
         "caption_style": caption_style,
-        "video_url": f"/outputs/{output_path.parent.parent.name}/{output_path.parent.name}/{output_path.name}"
+        "video_url": _output_rel_url(output_path)
     }
 
 

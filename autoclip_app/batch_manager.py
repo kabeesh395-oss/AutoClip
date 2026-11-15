@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 import sqlite3
 import uuid
 from contextlib import contextmanager
@@ -10,7 +11,7 @@ from typing import Any, Generator
 
 ROOT = Path(__file__).resolve().parents[1]
 DATA = ROOT / "data"
-BATCH_DB = DATA / "autoclip.sqlite3"
+BATCH_DB = Path(os.getenv("AUTOCLIP_DB_PATH", str(DATA / "autoclip.sqlite3")))
 IST = timezone(timedelta(hours=5, minutes=30))
 
 # All 15 required job states from SRS FR-14
@@ -260,7 +261,9 @@ def get_creator(creator_id: str, db_path: Path = BATCH_DB) -> dict[str, Any] | N
 
 def list_creators(db_path: Path = BATCH_DB) -> list[dict[str, Any]]:
     with get_db(db_path) as conn:
-        rows = conn.execute("SELECT * FROM creators ORDER BY created_at DESC").fetchall()
+        rows = conn.execute(
+            "SELECT * FROM (SELECT * FROM creators ORDER BY created_at DESC) GROUP BY name ORDER BY created_at DESC"
+        ).fetchall()
         return [dict(r) for r in rows]
 
 
