@@ -246,9 +246,11 @@ def get_youtube_status():
 
 
 @app.post("/api/youtube/connect")
-def youtube_connect():
+def youtube_connect(payload: dict | None = None):
     try:
-        return connect_youtube()
+        code = payload.get("code") or payload.get("authorization_code") if payload else None
+        red_uri = payload.get("redirect_uri") if payload else None
+        return connect_youtube(authorization_code=code, redirect_uri=red_uri)
     except Exception as exc:
         raise HTTPException(400, str(exc)) from exc
 

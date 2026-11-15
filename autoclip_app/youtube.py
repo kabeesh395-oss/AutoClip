@@ -41,7 +41,7 @@ def youtube_status() -> dict[str, Any]:
         return {"connected": False, "configured": True, "message": f"Could not read YouTube token: {exc}"}
 
 
-def connect_youtube() -> dict[str, Any]:
+def connect_youtube(authorization_code: str | None = None, redirect_uri: str | None = None, port: int = 8088) -> dict[str, Any]:
     if not SECRETS_FILE.exists():
         raise RuntimeError(
             "Missing client_secrets.json. Create a Google Cloud OAuth Desktop app client, "
@@ -49,11 +49,36 @@ def connect_youtube() -> dict[str, Any]:
         )
     from google_auth_oauthlib.flow import InstalledAppFlow
 
+    # Handle direct authorization code exchange if user pastes redirected URL or code
+    if authorization_code:
+        import urllib.parse
+        clean_code = authorization_code.strip()
+        red_uri = redirect_uri or "http://127.0.0.1:8088/"
+        if "code=" in clean_code:
+            parsed = urllib.parse.urlparse(clean_code)
+            params = urllib.parse.parse_qs(parsed.query)
+            clean_code = params.get("code", [clean_code])[0]
+            if not redirect_uri and parsed.netloc:
+                red_uri = f"{parsed.scheme}://{parsed.netloc}{parsed.path}"
+
+        flow = InstalledAppFlow.from_client_secrets_file(str(SECRETS_FILE), SCOPES, redirect_uri=red_uri)
+        flow.fetch_token(code=clean_code)
+        _save_credentials(flow.credentials)
+        return youtube_status()
+
+    # Otherwise run local web server to catch OAuth callback
     flow = InstalledAppFlow.from_client_secrets_file(str(SECRETS_FILE), SCOPES)
-    credentials = flow.run_local_server(
-        host="127.0.0.1", port=0, open_browser=True, access_type="offline",
-        prompt="consent",
-    )
+    try:
+        credentials = flow.run_local_server(
+            host="127.0.0.1", port=port, open_browser=True, access_type="offline",
+            prompt="consent",
+        )
+    except OSError:
+        # Fallback to random available port if specified port is in use
+        credentials = flow.run_local_server(
+            host="127.0.0.1", port=0, open_browser=True, access_type="offline",
+            prompt="consent",
+        )
     _save_credentials(credentials)
     return youtube_status()
 
