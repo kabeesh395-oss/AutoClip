@@ -675,14 +675,31 @@
         badge.textContent = batches.length;
 
         if (batches.length === 0) {
-          select.innerHTML = '<option value="">No Projects Found</option>';
+          currentBatchId = null;
+          currentClips = [];
+          select.innerHTML = '<option value="">No Projects (Ready)</option>';
           cardsCont.innerHTML = `
-            <div class="col-span-full py-12 text-center text-text-muted bg-surface-low border border-dashed border-border rounded-2xl">
-              <span class="material-symbols-outlined text-3xl text-text-subtle mb-1">folder_off</span>
-              <p class="font-headline font-semibold text-white text-sm">No video projects yet</p>
-              <button onclick="openNewBatchModal()" class="mt-3 px-4 py-2 bg-gradient-to-r from-primary to-secondary text-white text-xs rounded-xl font-bold shadow-md">+ Create First Project</button>
+            <div class="col-span-full py-14 text-center text-text-muted bg-surface-low border border-dashed border-border rounded-2xl">
+              <span class="material-symbols-outlined text-4xl text-text-subtle mb-2">folder_off</span>
+              <p class="font-headline font-bold text-white text-base">No video projects yet</p>
+              <p class="text-xs text-text-subtle mt-1 mb-4">Paste a video link or drop an MP4 file in the Studio above to start.</p>
+              <button onclick="openNewBatchModal()" class="px-5 py-2.5 bg-gradient-to-r from-primary to-secondary text-white text-xs rounded-xl font-bold shadow-md hover:brightness-110 transition-all">+ Create First Project</button>
             </div>
           `;
+          document.getElementById('activeBatchTitle').textContent = 'Ready for New Video';
+          document.getElementById('activeBatchStatusBadge').textContent = 'READY';
+          document.getElementById('activeBatchSubtitle').textContent = 'OpusClip-grade AI Virality Engine • Faster-Whisper Word Timestamps • 100% Review Gate';
+          document.getElementById('clipsGrid').innerHTML = `
+            <div class="col-span-full py-16 text-center text-text-muted bg-surface-low border border-dashed border-border rounded-2xl">
+              <span class="material-symbols-outlined text-4xl text-secondary mb-2">auto_videocam</span>
+              <p class="font-headline font-bold text-white text-base">Ready to Generate Viral Clips</p>
+              <p class="text-xs text-text-subtle mt-1">Paste any YouTube URL or click "upload MP4 file directly" above to create clips.</p>
+            </div>
+          `;
+          const floatingCount = document.getElementById('floatingApprovedCount');
+          if (floatingCount) floatingCount.textContent = '0 of 0 Approved';
+          renderJobs([]);
+          renderSchedules([]);
           return;
         }
 
@@ -1045,6 +1062,34 @@
       }
     });
 
+    // Auto-create batch helper for 1-click ingest
+    async function ensureActiveBatch(defaultName = 'Viral Clip Project') {
+      if (currentBatchId) return currentBatchId;
+      showToast('Creating new project…', 'info');
+      try {
+        const createRes = await fetch('/api/batches', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            name: `${defaultName} ${new Date().toLocaleDateString([], { month: 'short', day: 'numeric' })}`,
+            target_videos_per_day: 3,
+            schedule_days: 3,
+            timezone: 'Asia/Kolkata',
+            language: 'en',
+            whisper_model: 'small'
+          })
+        });
+        const data = await createRes.json();
+        const newId = data.id || data.batch_id;
+        await loadBatches();
+        currentBatchId = newId;
+        return newId;
+      } catch (err) {
+        console.error('Error creating batch:', err);
+        return null;
+      }
+    }
+
     // File Drag & Drop Upload
     const fileInput = document.getElementById('fileInput');
     if (fileInput) {
@@ -1054,15 +1099,16 @@
     }
 
     async function uploadFile(file) {
-      if (!currentBatchId) return showToast('Select an active project first', 'error');
+      const batchId = await ensureActiveBatch('Upload ' + file.name.replace(/\.[^/.]+$/, ''));
+      if (!batchId) return showToast('Failed to initialize project', 'error');
       showToast(`Uploading ${file.name}…`, 'info');
       const fd = new FormData();
       fd.append('file', file);
       try {
-        const res = await fetch(`/api/batches/${currentBatchId}/upload-source`, { method: 'POST', body: fd });
+        const res = await fetch(`/api/batches/${batchId}/upload-source`, { method: 'POST', body: fd });
         if (res.ok) {
           showToast('Uploaded successfully! Generating viral clips…');
-          selectBatch(currentBatchId);
+          selectBatch(batchId);
           switchTab('tab-studio');
         } else {
           showToast('Upload failed', 'error');
@@ -1075,13 +1121,17 @@
     // Source URL Form (Hero Generator Submit)
     document.getElementById('sourceUrlForm').addEventListener('submit', async (e) => {
       e.preventDefault();
-      if (!currentBatchId) return showToast('Select an active project first', 'error');
       const fd = new FormData(e.target);
       const url = fd.get('source_url');
+      if (!url) return;
+
+      const batchId = await ensureActiveBatch('YouTube Viral Ingest');
+      if (!batchId) return showToast('Failed to initialize project', 'error');
+
       showToast('Importing video & analyzing viral moments…', 'info');
 
       try {
-        const res = await fetch(`/api/batches/${currentBatchId}/sources`, {
+        const res = await fetch(`/api/batches/${batchId}/sources`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ source_url: url, title: 'Viral Video Source' })
@@ -1089,7 +1139,7 @@
         const data = await res.json();
         if (res.ok) {
           showToast('Video imported! Generating clips…');
-          selectBatch(currentBatchId);
+          selectBatch(batchId);
           document.getElementById('sourceUrlInput').value = '';
         } else {
           showToast(data.detail || 'Import failed', 'error');
