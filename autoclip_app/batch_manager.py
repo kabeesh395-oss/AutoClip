@@ -397,6 +397,18 @@ def list_batches(db_path: Path = BATCH_DB) -> list[dict[str, Any]]:
         return result
 
 
+def delete_batch(batch_id: str, db_path: Path = BATCH_DB) -> bool:
+    """Deletes a batch and cascades deletion across schedules, clips, jobs, and sources."""
+    with get_db(db_path) as conn:
+        conn.execute("DELETE FROM schedules WHERE batch_id = ?", (batch_id,))
+        conn.execute("DELETE FROM clips WHERE batch_id = ?", (batch_id,))
+        conn.execute("DELETE FROM jobs WHERE batch_id = ?", (batch_id,))
+        conn.execute("DELETE FROM sources WHERE batch_id = ?", (batch_id,))
+        conn.execute("DELETE FROM batches WHERE id = ?", (batch_id,))
+    log_audit("DELETE_BATCH", "batch", batch_id, batch_id=batch_id, details=f"Deleted batch {batch_id}", db_path=db_path)
+    return True
+
+
 def add_source_to_batch(
     batch_id: str,
     source_url: str,

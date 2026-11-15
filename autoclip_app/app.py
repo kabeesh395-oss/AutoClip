@@ -28,6 +28,7 @@ from .batch_manager import (
     add_source_to_batch,
     create_batch,
     create_creator,
+    delete_batch,
     generate_batch_schedule_slots,
     get_batch,
     get_batch_report,
@@ -585,6 +586,15 @@ def api_get_batch(batch_id: str):
     if not batch:
         raise HTTPException(404, "Batch not found")
     return batch
+
+
+@app.delete("/api/batches/{batch_id}")
+def api_delete_batch(batch_id: str):
+    batch = get_batch(batch_id)
+    if not batch:
+        raise HTTPException(404, "Batch not found")
+    delete_batch(batch_id)
+    return {"status": "deleted", "batch_id": batch_id}
 
 
 @app.post("/api/batches/{batch_id}/sources")
