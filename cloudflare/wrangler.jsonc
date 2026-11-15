@@ -1,0 +1,25 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "autoclip-api",
+  "main": "worker.js",
+  "compatibility_date": "2024-09-23",
+  "compatibility_flags": ["nodejs_compat"],
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "autoclip-d1",
+      "database_id": "YOUR_D1_DATABASE_ID_HERE"
+    }
+  ],
+  "r2_buckets": [
+    {
+      "binding": "BUCKET",
+      "bucket_name": "autoclip-storage"
+    }
+  ],
+  "vars": {
+    "APP_NAME": "AutoClip AI Control Plane",
+    "TIMEZONE": "Asia/Kolkata",
+    "MAX_BATCH_SIZE": "9"
+  }
+}

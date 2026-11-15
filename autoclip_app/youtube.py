@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
@@ -21,7 +22,7 @@ def youtube_status() -> dict[str, Any]:
         return {
             "connected": False,
             "configured": False,
-            "message": "Add your Google OAuth Desktop client file as autoclip-app/client_secrets.json.",
+            "message": "Add your Google OAuth Desktop client file as client_secrets.json (repository root).",
         }
     if not TOKEN_FILE.exists():
         return {"connected": False, "configured": True, "message": "YouTube account not connected yet."}
@@ -44,7 +45,7 @@ def connect_youtube() -> dict[str, Any]:
     if not SECRETS_FILE.exists():
         raise RuntimeError(
             "Missing client_secrets.json. Create a Google Cloud OAuth Desktop app client, "
-            "enable YouTube Data API v3, and place the downloaded JSON at autoclip-app/client_secrets.json."
+            "enable YouTube Data API v3, and place the downloaded JSON at client_secrets.json (repository root)."
         )
     from google_auth_oauthlib.flow import InstalledAppFlow
 
@@ -95,3 +96,69 @@ def upload_public_video(
         _, response = request.next_chunk()
     video_id = str(response["id"])
     return {"video_id": video_id, "url": f"https://www.youtube.com/watch?v={video_id}", "privacy_status": "public"}
+
+
+def schedule_youtube_video(
+    video_path: Path,
+    title: str,
+    description: str,
+    publish_at_iso: str,
+    tags: list[str] | None = None,
+    category_id: str = "22",
+) -> dict[str, str]:
+    """
+    Upload a video to YouTube with scheduled publishing.
+    Video is uploaded as 'private' with 'publishAt' timestamp in UTC/ISO8601.
+    YouTube automatically publishes the video at the designated time, allowing the
+    local computer to be shut down safely.
+    """
+    status = youtube_status()
+    if not status["connected"]:
+        raise RuntimeError(status["message"])
+
+    from google.oauth2.credentials import Credentials
+    from googleapiclient.discovery import build
+    from googleapiclient.http import MediaFileUpload
+
+    credentials = Credentials.from_authorized_user_file(str(TOKEN_FILE), SCOPES)
+    youtube = build("youtube", "v3", credentials=credentials, cache_discovery=False)
+    safe_title = (title or video_path.stem).strip()[:100] or video_path.stem
+    safe_description = (description or "Created with AutoClip AI.")[:5000]
+    safe_tags = [str(tag).strip()[:30] for tag in (tags or []) if str(tag).strip()][:30]
+
+    try:
+        dt = datetime.fromisoformat(publish_at_iso)
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone(timedelta(hours=5, minutes=30)))
+        utc_dt = dt.astimezone(timezone.utc)
+        publish_at_utc = utc_dt.strftime("%Y-%m-%dT%H:%M:%SZ")
+    except Exception:
+        publish_at_utc = publish_at_iso
+
+    body = {
+        "snippet": {
+            "title": safe_title,
+            "description": safe_description,
+            "tags": safe_tags,
+            "categoryId": category_id,
+        },
+        "status": {
+            "privacyStatus": "private",
+            "publishAt": publish_at_utc,
+            "selfDeclaredMadeForKids": False,
+        },
+    }
+    media = MediaFileUpload(
+        str(video_path), mimetype="video/mp4", chunksize=8 * 1024 * 1024, resumable=True
+    )
+    request = youtube.videos().insert(part="snippet,status", body=body, media_body=media)
+    response = None
+    while response is None:
+        _, response = request.next_chunk()
+    video_id = str(response["id"])
+    return {
+        "video_id": video_id,
+        "url": f"https://www.youtube.com/watch?v={video_id}",
+        "privacy_status": "private",
+        "publish_at": publish_at_utc,
+    }
