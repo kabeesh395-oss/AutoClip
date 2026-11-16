@@ -164,6 +164,8 @@ def init_batch_tables(db_path: Path = BATCH_DB) -> None:
             rights_status TEXT NOT NULL DEFAULT 'PASS',
             approval_status TEXT NOT NULL DEFAULT 'PENDING',
             approved_at TEXT,
+            youtube_video_id TEXT,
+            youtube_url TEXT,
             created_at TEXT NOT NULL,
             FOREIGN KEY (batch_id) REFERENCES batches(id) ON DELETE CASCADE,
             FOREIGN KEY (source_id) REFERENCES sources(id) ON DELETE CASCADE

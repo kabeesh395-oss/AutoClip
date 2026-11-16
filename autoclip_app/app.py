@@ -245,6 +245,17 @@ def get_youtube_status():
     return youtube_status()
 
 
+@app.get("/api/youtube/auth-url")
+def get_youtube_auth_url(redirect_uri: str | None = None):
+    try:
+        from .youtube import get_authorization_url
+        url = get_authorization_url(redirect_uri=redirect_uri or "http://127.0.0.1:8088/")
+        stat = youtube_status()
+        return {"auth_url": url, **stat}
+    except Exception as exc:
+        raise HTTPException(400, str(exc)) from exc
+
+
 @app.post("/api/youtube/connect")
 def youtube_connect(payload: dict | None = None):
     try:
@@ -968,11 +979,64 @@ def api_cancel_job(job_id: str):
     return {"status": "CANCELLED", "job_id": job_id}
 
 
+@app.post("/api/clips/{clip_id}/publish-youtube")
+def api_publish_clip_to_youtube(clip_id: str, payload: dict = Body(default={})):
+    yt_stat = youtube_status()
+    if not yt_stat.get("connected"):
+        raise HTTPException(400, "YouTube account is not connected. Please connect your YouTube channel first.")
+
+    with get_db() as conn:
+        clip_row = conn.execute("SELECT * FROM clips WHERE id = ?", (clip_id,)).fetchone()
+
+    if not clip_row:
+        raise HTTPException(404, "Clip not found")
+
+    clip = dict(clip_row)
+    video_p = Path(clip["output_path"]) if clip.get("output_path") else None
+    if not video_p or not video_p.exists():
+        raise HTTPException(400, f"Rendered video file missing at {video_p}")
+
+    privacy = payload.get("privacy", "public")
+    tags = []
+    try:
+        tags = json.loads(clip.get("hashtags_json") or "[]")
+    except Exception:
+        tags = []
+    tags = [str(t).lstrip("#") for t in tags]
+
+    try:
+        from .youtube import upload_public_video
+        res = upload_public_video(
+            video_path=video_p,
+            title=clip.get("title", video_p.stem),
+            description=clip.get("description", "Created with AutoClip AI"),
+            tags=tags,
+            privacy_status=privacy,
+        )
+        with get_db() as conn:
+            conn.execute("""
+                UPDATE clips
+                SET approval_status = 'APPROVED',
+                    youtube_video_id = ?,
+                    youtube_url = ?
+                WHERE id = ?
+            """, (res["video_id"], res["url"], clip_id))
+        return {
+            "success": True,
+            "video_id": res["video_id"],
+            "url": res["url"],
+            "title": clip.get("title"),
+            "clip_id": clip_id,
+        }
+    except Exception as exc:
+        raise HTTPException(500, f"YouTube upload failed: {exc}") from exc
+
+
 @app.post("/api/batches/{batch_id}/commit-cloud-schedule")
 def api_commit_cloud_schedule(batch_id: str):
     yt_stat = youtube_status()
     if not yt_stat.get("connected"):
-        raise HTTPException(400, "YouTube account is not connected. Connect YouTube in settings before cloud scheduling.")
+        raise HTTPException(400, "YouTube account is not connected. Connect YouTube channel first before scheduling uploads.")
 
     batch = get_batch(batch_id)
     if not batch:
@@ -988,7 +1052,21 @@ def api_commit_cloud_schedule(batch_id: str):
         """, (batch_id,)).fetchall()
 
     if not scheduled_slots:
-        raise HTTPException(400, "No pending scheduled slots found for this batch. Generate schedule slots first.")
+        try:
+            generate_batch_schedule_slots(batch_id)
+        except Exception:
+            pass
+        with get_db() as conn:
+            scheduled_slots = conn.execute("""
+                SELECT s.*, c.output_path, c.title, c.description, c.hashtags_json, c.approval_status
+                FROM schedules s
+                JOIN clips c ON s.clip_id = c.id
+                WHERE s.batch_id = ? AND s.status = 'PENDING'
+                ORDER BY s.scheduled_at ASC
+            """, (batch_id,)).fetchall()
+
+    if not scheduled_slots:
+        raise HTTPException(400, "No approved clips found in this batch to schedule. Approve clips in Studio first.")
 
     committed_results = []
     for slot in scheduled_slots:

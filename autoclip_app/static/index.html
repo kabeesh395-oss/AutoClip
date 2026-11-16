@@ -148,11 +148,11 @@
         </select>
       </div>
 
-      <!-- YouTube Status Pill -->
-      <div class="hidden sm:flex items-center gap-1.5 bg-surface-low px-2.5 py-1 rounded-lg border border-border text-xs">
+      <!-- YouTube Status Pill (Visible on Mobile & Desktop) -->
+      <div onclick="openYouTubeModal()" class="flex items-center gap-1.5 bg-surface-low hover:bg-surface-card px-2.5 py-1 rounded-lg border border-border text-xs cursor-pointer transition-colors" title="YouTube Channel Status">
         <span id="ytStatusDot" class="w-2 h-2 rounded-full bg-text-subtle"></span>
-        <span id="ytStatusText" class="font-mono text-[11px] text-white">YouTube</span>
-        <button id="btnConnectYoutubeTop" class="text-[11px] font-semibold text-secondary hover:underline ml-1">Connect</button>
+        <span id="ytStatusText" class="font-mono text-[10px] sm:text-[11px] text-white">YouTube</span>
+        <button id="btnConnectYoutubeTop" class="text-[10px] sm:text-[11px] font-semibold text-secondary hover:underline ml-0.5">Connect</button>
       </div>
 
       <!-- Export ZIP Button (Required for test assertions) -->
@@ -535,6 +535,78 @@
     </div>
   </div>
 
+  <!-- YouTube Connection Modal (Works for PC & Mobile) -->
+  <div id="modalYouTubeConnect" class="fixed inset-0 z-50 bg-black/85 backdrop-blur-md hidden flex items-center justify-center p-4">
+    <div class="bg-surface-low border border-red-500/40 rounded-2xl p-5 sm:p-6 max-w-md w-full space-y-4 shadow-2xl relative">
+      <button onclick="closeYouTubeModal()" class="absolute top-4 right-4 text-text-subtle hover:text-white p-1 rounded-lg">
+        <span class="material-symbols-outlined">close</span>
+      </button>
+
+      <div class="flex items-center gap-3">
+        <div class="w-10 h-10 rounded-xl bg-red-600/20 border border-red-500/30 flex items-center justify-center">
+          <span class="material-symbols-outlined text-red-500 text-[24px]">smart_display</span>
+        </div>
+        <div>
+          <h3 class="font-headline text-base sm:text-lg font-bold text-white">Connect YouTube Channel</h3>
+          <p class="text-xs text-text-muted">Authorize AutoClip to upload & schedule your viral clips.</p>
+        </div>
+      </div>
+
+      <!-- State: Disconnected -->
+      <div id="ytModalDisconnected" class="space-y-4 pt-1">
+        <div class="bg-surface p-3.5 rounded-xl border border-border space-y-2 text-xs text-text-muted">
+          <div class="font-headline font-semibold text-white flex items-center gap-1.5">
+            <span class="material-symbols-outlined text-secondary text-[16px]">info</span>
+            <span>How Connection Works:</span>
+          </div>
+          <ol class="list-decimal pl-4 space-y-1 text-text-subtle text-[11px] leading-relaxed">
+            <li>Click <b>Sign In with Google</b> below to open Google's consent screen.</li>
+            <li>Select your Google / YouTube account and tap <b>Allow / Continue</b>.</li>
+            <li>If on PC desktop, authorization finishes automatically!</li>
+            <li>If on phone or redirected to localhost refused: copy the URL from your phone browser address bar and paste it below.</li>
+          </ol>
+        </div>
+
+        <button id="btnOpenGoogleAuth" onclick="openGoogleOAuthWindow()" class="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-red-600 to-rose-600 hover:brightness-110 text-white font-headline text-xs font-bold py-3 rounded-xl shadow-lg transition-all active:scale-95">
+          <span class="material-symbols-outlined text-[18px]">key</span>
+          <span>1. Sign In with Google</span>
+        </button>
+
+        <div class="relative flex py-1 items-center">
+          <div class="flex-grow border-t border-border"></div>
+          <span class="flex-shrink mx-3 text-text-subtle text-[10px] uppercase font-mono">Mobile / Paste Code</span>
+          <div class="flex-grow border-t border-border"></div>
+        </div>
+
+        <form id="formExchangeYtCode" onsubmit="submitOAuthCode(event)" class="space-y-2">
+          <label class="block text-[11px] font-headline text-text-muted">2. Paste Redirect URL or Code</label>
+          <div class="flex items-center gap-2">
+            <input type="text" id="inputYtOAuthCode" placeholder="http://127.0.0.1:8088/?code=4/0A... or code string" class="flex-1 bg-surface-card text-white text-xs font-mono rounded-xl border border-border px-3 py-2.5 focus:ring-1 focus:ring-secondary">
+            <button type="submit" class="bg-secondary hover:bg-secondary-glow text-surface font-headline text-xs font-bold px-4 py-2.5 rounded-xl transition-all whitespace-nowrap">
+              Connect
+            </button>
+          </div>
+        </form>
+      </div>
+
+      <!-- State: Connected -->
+      <div id="ytModalConnected" class="hidden space-y-4 pt-1 text-center">
+        <div class="w-16 h-16 rounded-full bg-tertiary/20 border-2 border-tertiary mx-auto flex items-center justify-center shadow-[0_0_20px_rgba(16,185,129,0.3)]">
+          <span class="material-symbols-outlined text-tertiary text-[32px]">check</span>
+        </div>
+        <div>
+          <h4 id="ytModalChannelName" class="font-headline text-base font-bold text-white">Channel Connected</h4>
+          <p class="text-xs text-tertiary mt-0.5">Ready for instant & scheduled YouTube uploads</p>
+        </div>
+        <div class="pt-2 flex items-center gap-2 justify-center">
+          <button onclick="closeYouTubeModal()" class="bg-surface-card hover:bg-surface-high border border-border text-white text-xs font-headline font-semibold px-4 py-2 rounded-xl transition-colors">
+            Done
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- Toast Notification -->
   <div id="toast" class="fixed top-5 right-5 z-50 bg-surface-card border border-border text-white text-xs font-headline px-3.5 py-2.5 rounded-xl shadow-2xl transition-all transform translate-y-[-100px] opacity-0 flex items-center gap-2">
     <span id="toastIcon" class="material-symbols-outlined text-[16px] text-tertiary">check_circle</span>
@@ -612,6 +684,88 @@
       }
     }
 
+    // YouTube Modal & OAuth Management
+    let ytPollTimer = null;
+
+    function openYouTubeModal() {
+      document.getElementById('modalYouTubeConnect').classList.remove('hidden');
+      checkModalYoutubeStatus();
+      if (ytPollTimer) clearInterval(ytPollTimer);
+      ytPollTimer = setInterval(checkModalYoutubeStatus, 2500);
+    }
+
+    function closeYouTubeModal() {
+      document.getElementById('modalYouTubeConnect').classList.add('hidden');
+      if (ytPollTimer) {
+        clearInterval(ytPollTimer);
+        ytPollTimer = null;
+      }
+      checkYoutubeStatus();
+    }
+
+    async function checkModalYoutubeStatus() {
+      try {
+        const res = await fetch('/api/youtube/status');
+        const data = await res.json();
+        const dis = document.getElementById('ytModalDisconnected');
+        const con = document.getElementById('ytModalConnected');
+        const chan = document.getElementById('ytModalChannelName');
+
+        if (data.connected) {
+          if (dis) dis.classList.add('hidden');
+          if (con) con.classList.remove('hidden');
+          if (chan) chan.textContent = data.channel_title || 'YouTube Channel Connected';
+          checkYoutubeStatus();
+        } else {
+          if (dis) dis.classList.remove('hidden');
+          if (con) con.classList.add('hidden');
+        }
+      } catch (e) {}
+    }
+
+    async function openGoogleOAuthWindow() {
+      showToast('Opening Google OAuth login…', 'info');
+      try {
+        const res = await fetch('/api/youtube/auth-url');
+        const data = await res.json();
+        if (data.auth_url) {
+          window.open(data.auth_url, '_blank');
+          showToast('Google sign-in opened. Click Allow and return here.');
+        } else {
+          showToast(data.message || 'Could not get OAuth link', 'error');
+        }
+      } catch (e) {
+        showToast('Error opening Google OAuth: ' + e.message, 'error');
+      }
+    }
+
+    async function submitOAuthCode(e) {
+      e.preventDefault();
+      const input = document.getElementById('inputYtOAuthCode');
+      const code = (input ? input.value : '').trim();
+      if (!code) return showToast('Please paste the redirect URL or code first', 'warning');
+
+      showToast('Connecting channel…', 'info');
+      try {
+        const res = await fetch('/api/youtube/connect', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ code: code })
+        });
+        const data = await res.json();
+        if (data.connected) {
+          showToast('🎉 YouTube channel successfully connected!', 'success');
+          checkModalYoutubeStatus();
+          checkYoutubeStatus();
+          setTimeout(closeYouTubeModal, 1500);
+        } else {
+          showToast(data.message || 'Connection failed. Verify code.', 'error');
+        }
+      } catch (err) {
+        showToast('Connection error: ' + err.message, 'error');
+      }
+    }
+
     // YouTube Status Check
     async function checkYoutubeStatus() {
       try {
@@ -624,39 +778,53 @@
 
         if (data.connected) {
           if (dot) dot.className = 'w-2 h-2 rounded-full bg-tertiary shadow-[0_0_8px_#10B981]';
-          if (text) text.textContent = 'YouTube Connected';
-          if (details) details.textContent = 'Connected (Authorized for Scheduled Publishing)';
+          const label = data.channel_title ? data.channel_title.slice(0, 14) : 'Connected';
+          if (text) text.textContent = label;
+          if (details) details.textContent = `Connected: ${data.channel_title || 'Channel Active'} (Ready for Uploads)`;
           if (btn) {
             btn.textContent = 'Linked ✓';
-            btn.disabled = true;
-            btn.classList.add('opacity-60');
+            btn.onclick = (e) => { e.stopPropagation(); openYouTubeModal(); };
           }
         } else {
           if (dot) dot.className = 'w-2 h-2 rounded-full bg-warning';
-          if (text) text.textContent = data.configured ? 'Not Connected' : 'No Secrets';
+          if (text) text.textContent = data.configured ? 'Not Linked' : 'No Secrets';
           if (details) details.textContent = data.configured ? 'Google OAuth Configured • Ready to Connect' : 'OAuth secrets required in client_secrets.json';
           if (btn) {
             btn.textContent = 'Connect';
-            btn.disabled = false;
-            btn.onclick = async () => {
-              btn.disabled = true;
-              showToast('Opening Google OAuth in browser…', 'info');
-              try {
-                const r = await fetch('/api/youtube/connect', { method: 'POST' });
-                const j = await r.json();
-                if (!r.ok) throw new Error(j.detail || j.message || 'Error ' + r.status);
-                showToast(j.message || 'Connected to YouTube');
-                checkYoutubeStatus();
-              } catch (err) {
-                alert('OAuth Status: ' + err.message);
-              } finally {
-                btn.disabled = false;
-              }
-            };
+            btn.onclick = (e) => { e.stopPropagation(); openYouTubeModal(); };
           }
         }
       } catch (err) {
         console.error(err);
+      }
+    }
+
+    // 1-Click Direct Publish Clip to YouTube
+    async function publishClipToYouTube(clipId) {
+      const statRes = await fetch('/api/youtube/status');
+      const stat = await statRes.json();
+      if (!stat.connected) {
+        showToast('Please connect your YouTube channel first', 'warning');
+        openYouTubeModal();
+        return;
+      }
+
+      showToast('🚀 Uploading clip to YouTube channel… Please wait…', 'info');
+      try {
+        const res = await fetch(`/api/clips/${clipId}/publish-youtube`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ privacy: 'public' })
+        });
+        const data = await res.json();
+        if (res.ok) {
+          showToast(`🎉 Live on YouTube! ${data.title || ''}`, 'success');
+          loadBatchClips(currentBatchId);
+        } else {
+          showToast(data.detail || 'YouTube upload failed', 'error');
+        }
+      } catch (err) {
+        showToast('Upload error: ' + err.message, 'error');
       }
     }
 
@@ -948,16 +1116,30 @@
                 </div>
               </div>
 
-              <!-- Action Bar (Approve & Download) -->
-              <div class="pt-3 border-t border-border flex items-center justify-between gap-2.5">
-                <button onclick="toggleClipApproval('${c.id}', ${!isApproved})" class="flex-1 min-h-[42px] py-2 px-3 rounded-xl font-headline text-xs font-bold flex items-center justify-center gap-1.5 transition-all ${isApproved ? 'bg-gradient-to-r from-tertiary to-secondary text-white shadow-lg' : 'bg-surface-high hover:bg-surface-highest text-white border border-border'}">
-                  <span class="material-symbols-outlined text-[17px]">${isApproved ? 'check_circle' : 'radio_button_unchecked'}</span>
-                  <span>${isApproved ? 'Approved ✓' : 'Approve Clip'}</span>
-                </button>
+              <!-- Action Bar (Approve, Download & YouTube Publish) -->
+              <div class="pt-3 border-t border-border flex flex-col gap-2">
+                <div class="flex items-center justify-between gap-2">
+                  <button onclick="toggleClipApproval('${c.id}', ${!isApproved})" class="flex-1 min-h-[40px] py-2 px-3 rounded-xl font-headline text-xs font-bold flex items-center justify-center gap-1.5 transition-all ${isApproved ? 'bg-gradient-to-r from-tertiary to-secondary text-white shadow-lg' : 'bg-surface-high hover:bg-surface-highest text-white border border-border'}">
+                    <span class="material-symbols-outlined text-[17px]">${isApproved ? 'check_circle' : 'radio_button_unchecked'}</span>
+                    <span>${isApproved ? 'Approved ✓' : 'Approve Clip'}</span>
+                  </button>
 
-                <a href="${c.video_url || '#'}" download class="min-h-[42px] px-3.5 rounded-xl bg-surface hover:bg-surface-high text-text-muted hover:text-white border border-border flex items-center justify-center transition-colors" title="Download MP4">
-                  <span class="material-symbols-outlined text-[18px]">download</span>
-                </a>
+                  <a href="${c.video_url || '#'}" download class="min-h-[40px] px-3.5 rounded-xl bg-surface hover:bg-surface-high text-text-muted hover:text-white border border-border flex items-center justify-center transition-colors" title="Download MP4">
+                    <span class="material-symbols-outlined text-[18px]">download</span>
+                  </a>
+                </div>
+
+                ${c.youtube_url ? `
+                  <a href="${c.youtube_url}" target="_blank" class="w-full min-h-[38px] py-2 px-3 rounded-xl font-headline text-xs font-bold flex items-center justify-center gap-1.5 bg-tertiary/15 text-tertiary border border-tertiary/40 hover:bg-tertiary/25 transition-all">
+                    <span class="material-symbols-outlined text-[17px]">smart_display</span>
+                    <span>Live on YouTube ↗</span>
+                  </a>
+                ` : `
+                  <button onclick="publishClipToYouTube('${c.id}')" class="w-full min-h-[38px] py-2 px-3 rounded-xl font-headline text-xs font-bold flex items-center justify-center gap-1.5 bg-gradient-to-r from-red-600 to-rose-600 hover:brightness-110 text-white shadow-md transition-all active:scale-98">
+                    <span class="material-symbols-outlined text-[17px]">upload</span>
+                    <span>Publish to YouTube</span>
+                  </button>
+                `}
               </div>
             </div>
           </article>
@@ -1034,15 +1216,22 @@
         tbody.innerHTML = '<tr><td colspan="5" class="p-5 text-center text-text-subtle">No release slots configured. Approve clips in Studio to slot them.</td></tr>';
         return;
       }
-      tbody.innerHTML = slots.map(s => `
-        <tr class="hover:bg-surface-card transition-colors">
-          <td class="p-3.5 text-white font-bold">Slot #${s.slot_number}</td>
-          <td class="p-3.5"><span class="px-2.5 py-0.5 rounded-full text-[10px] font-bold ${s.format === 'SHORT' ? 'bg-primary/20 text-primary border border-primary/30' : 'bg-secondary/20 text-secondary border border-secondary/30'}">${s.format}</span></td>
-          <td class="p-3.5 text-text-muted">${s.slot_time || '12:00 PM'}</td>
-          <td class="p-3.5 text-white truncate max-w-[200px]">${s.clip_id || 'Pending Approval'}</td>
-          <td class="p-3.5"><span class="px-2.5 py-0.5 rounded-full text-[10px] uppercase font-bold ${s.status === 'APPROVED' ? 'bg-tertiary/20 text-tertiary border border-tertiary/30' : 'bg-surface-high text-text-subtle'}">${s.status}</span></td>
-        </tr>
-      `).join('');
+      tbody.innerHTML = slots.map(s => {
+        const isCommitted = s.status === 'COMMITTED' || s.youtube_video_id;
+        const statusHtml = isCommitted
+          ? `<a href="https://www.youtube.com/watch?v=${s.youtube_video_id || ''}" target="_blank" class="px-2.5 py-0.5 rounded-full text-[10px] uppercase font-bold bg-tertiary/20 text-tertiary border border-tertiary/30 hover:underline flex items-center gap-1 w-fit"><span>COMMITTED</span><span class="material-symbols-outlined text-[12px]">open_in_new</span></a>`
+          : `<span class="px-2.5 py-0.5 rounded-full text-[10px] uppercase font-bold ${s.status === 'APPROVED' ? 'bg-secondary/20 text-secondary border border-secondary/30' : 'bg-surface-high text-text-subtle'}">${s.status || 'PENDING'}</span>`;
+
+        return `
+          <tr class="hover:bg-surface-card transition-colors">
+            <td class="p-3.5 text-white font-bold">Slot #${s.slot_number}</td>
+            <td class="p-3.5"><span class="px-2.5 py-0.5 rounded-full text-[10px] font-bold ${s.format === 'SHORT' ? 'bg-primary/20 text-primary border border-primary/30' : 'bg-secondary/20 text-secondary border border-secondary/30'}">${s.format}</span></td>
+            <td class="p-3.5 text-text-muted">${s.slot_time || s.scheduled_at || '12:00 PM'}</td>
+            <td class="p-3.5 text-white truncate max-w-[200px]">${s.clip_id || 'Pending Approval'}</td>
+            <td class="p-3.5">${statusHtml}</td>
+          </tr>
+        `;
+      }).join('');
     }
 
     // Start Batch Processing
@@ -1189,22 +1378,36 @@
     document.getElementById('btnExportZip').addEventListener('click', exportZip);
     document.getElementById('floatingExportZipBtn').addEventListener('click', exportZip);
 
-    // Commit Schedule
+    // Commit Schedule to YouTube Cloud
     async function commitSchedule() {
       if (!currentBatchId) return showToast('Select a project first', 'error');
-      showToast('Committing approved clips to schedule…', 'info');
+
+      // Check YouTube connection first
+      const ytRes = await fetch('/api/youtube/status');
+      const ytData = await ytRes.json();
+      if (!ytData.connected) {
+        showToast('Please connect your YouTube channel first', 'warning');
+        openYouTubeModal();
+        return;
+      }
+
+      showToast('Committing approved clips to YouTube Cloud schedule…', 'info');
       try {
-        const res = await fetch(`/api/batches/${currentBatchId}/schedule`, { method: 'POST' });
+        // Step 1: Ensure slots exist
+        await fetch(`/api/batches/${currentBatchId}/schedule`, { method: 'POST' });
+
+        // Step 2: Upload and commit to YouTube
+        const res = await fetch(`/api/batches/${currentBatchId}/commit-cloud-schedule`, { method: 'POST' });
         const data = await res.json();
         if (res.ok) {
-          showToast('Committed to 3-Day schedule!');
+          showToast(`🎉 Scheduled ${data.count || 0} videos to YouTube!`, 'success');
           selectBatch(currentBatchId);
           switchTab('tab-schedule');
         } else {
           showToast(data.detail || 'Schedule commit failed', 'error');
         }
       } catch (e) {
-        showToast('Error committing schedule', 'error');
+        showToast('Error committing schedule: ' + e.message, 'error');
       }
     }
     document.getElementById('floatingCommitBtn').addEventListener('click', commitSchedule);
