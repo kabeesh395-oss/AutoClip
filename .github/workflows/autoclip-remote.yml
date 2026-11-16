@@ -47,6 +47,23 @@ jobs:
           YOUTUBE_CLIENT_SECRETS_JSON: ${{ secrets.AUTOCLIP_YOUTUBE_CLIENT_SECRETS_JSON }}
           YOUTUBE_TOKEN_JSON: ${{ secrets.AUTOCLIP_YOUTUBE_TOKEN_JSON }}
           VIDEO_URL: ${{ inputs.video_url || vars.AUTOCLIP_DAILY_VIDEO_URL }}
+        run: |
+          missing=0
+          if [ -z "$YOUTUBE_CLIENT_SECRETS_JSON" ]; then
+            echo "::error::Missing repository secret AUTOCLIP_YOUTUBE_CLIENT_SECRETS_JSON. Add the full client_secrets.json contents under Settings > Secrets and variables > Actions."
+            missing=1
+          fi
+          if [ -z "$YOUTUBE_TOKEN_JSON" ]; then
+            echo "::error::Missing repository secret AUTOCLIP_YOUTUBE_TOKEN_JSON. Add the full data/youtube_token.json contents under Settings > Secrets and variables > Actions."
+            missing=1
+          fi
+          if [ -z "$VIDEO_URL" ]; then
+            echo "::error::No source URL supplied. Enter video_url when running manually or set repository variable AUTOCLIP_DAILY_VIDEO_URL for the scheduled run."
+            missing=1
+          fi
+          if [ "$missing" -ne 0 ]; then
+            exit 1
+          fi
       - name: Install Python
         uses: actions/setup-python@v5
         with:
