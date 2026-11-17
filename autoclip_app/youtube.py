@@ -30,6 +30,19 @@ def _save_credentials(credentials: Any) -> None:
     TOKEN_FILE.write_text(credentials.to_json(), encoding="utf-8")
 
 
+def _get_token_scopes() -> list[str]:
+    if TOKEN_FILE.exists():
+        try:
+            with TOKEN_FILE.open("r", encoding="utf-8") as f:
+                data = json.load(f)
+                scopes = data.get("scopes")
+                if isinstance(scopes, list) and scopes:
+                    return scopes
+        except Exception:
+            pass
+    return SCOPES
+
+
 def youtube_status() -> dict[str, Any]:
     if not SECRETS_FILE.exists():
         return {
@@ -51,7 +64,7 @@ def youtube_status() -> dict[str, Any]:
         from google.auth.transport.requests import Request
         from google.oauth2.credentials import Credentials
 
-        credentials = Credentials.from_authorized_user_file(str(TOKEN_FILE), SCOPES)
+        credentials = Credentials.from_authorized_user_file(str(TOKEN_FILE), _get_token_scopes())
         if credentials.expired and credentials.refresh_token:
             credentials.refresh(Request())
             _save_credentials(credentials)
@@ -73,9 +86,9 @@ def youtube_status() -> dict[str, Any]:
             return {
                 "connected": True,
                 "configured": True,
-                "channel_title": channel_name or "Connected Channel",
+                "channel_title": channel_name or "Connected Channel (Upload Ready)",
                 "channel_thumbnail": channel_thumb,
-                "message": f"YouTube connected ({channel_name or 'Channel Active'}).",
+                "message": f"YouTube connected ({channel_name or 'Upload permissions active'}).",
             }
         return {
             "connected": False,
@@ -253,7 +266,7 @@ def upload_public_video(
     from googleapiclient.discovery import build
     from googleapiclient.http import MediaFileUpload
 
-    credentials = Credentials.from_authorized_user_file(str(TOKEN_FILE), SCOPES)
+    credentials = Credentials.from_authorized_user_file(str(TOKEN_FILE), _get_token_scopes())
     youtube = build("youtube", "v3", credentials=credentials, cache_discovery=False)
     safe_title = (title or video_path.stem).strip()[:100] or video_path.stem
     safe_description = (description or "Created with AutoClip AI.")[:5000]
@@ -306,7 +319,7 @@ def schedule_youtube_video(
     from googleapiclient.discovery import build
     from googleapiclient.http import MediaFileUpload
 
-    credentials = Credentials.from_authorized_user_file(str(TOKEN_FILE), SCOPES)
+    credentials = Credentials.from_authorized_user_file(str(TOKEN_FILE), _get_token_scopes())
     youtube = build("youtube", "v3", credentials=credentials, cache_discovery=False)
     safe_title = (title or video_path.stem).strip()[:100] or video_path.stem
     safe_description = (description or "Created with AutoClip AI.")[:5000]
