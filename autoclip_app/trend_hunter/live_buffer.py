@@ -5,6 +5,7 @@ import logging
 import os
 import shutil
 import subprocess
+import sys
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -90,6 +91,8 @@ class RollingLiveBuffer:
         # Real live capture: Try streamlink pipe to ffmpeg, fallback to direct ffmpeg
         segment_pattern = str(self.buffer_dir / "chunk_%04d.ts")
         streamlink_cmd = [
+            sys.executable,
+            "-m",
             "streamlink",
             "--stdout",
             stream_url,
