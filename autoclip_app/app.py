@@ -1178,3 +1178,81 @@ def api_worker_complete_job(job_id: str, payload: dict = Body(default={})):
         conn.execute("UPDATE jobs SET status = 'COMPLETED', progress = 100, stage_message = 'Completed', completed_at = ?, updated_at = ? WHERE id = ?",
                      (now, now, job_id))
     return {"status": "COMPLETED", "job_id": job_id, "clips_created": len(clips)}
+
+
+# =============================================================================
+# CHAT ACTIVITY SPIKE DETECTION ENGINE ENDPOINTS
+# =============================================================================
+
+@app.get("/api/chat-engine/status")
+def api_chat_engine_status():
+    from .chat_engine import chat_engine_service
+    return chat_engine_service.get_status()
+
+
+@app.get("/api/chat-engine/spikes")
+def api_chat_engine_spikes(session_id: str | None = None, limit: int = 50):
+    from .chat_engine import chat_engine_service, list_chat_spikes
+    return {
+        "session_id": session_id or chat_engine_service.active_session_id,
+        "spikes": list_chat_spikes(session_id=session_id or chat_engine_service.active_session_id, limit=limit)
+    }
+
+
+@app.post("/api/chat-engine/start")
+async def api_chat_engine_start(payload: dict = Body(default={})):
+    from .chat_engine import SpikeDetectorConfig, chat_engine_service
+
+    stream_target = str(payload.get("stream_target") or payload.get("channel") or "shroud").strip()
+    source_type = str(payload.get("source_type") or "twitch").lower()
+    video_path = payload.get("video_path")
+    sensitivity = payload.get("sensitivity", "medium")
+
+    config = SpikeDetectorConfig(
+        sensitivity=sensitivity,
+        pre_roll_seconds=float(payload.get("pre_roll_seconds", 20.0)),
+        post_roll_seconds=float(payload.get("post_roll_seconds", 40.0)),
+        min_confidence=float(payload.get("min_confidence", 55.0)),
+    )
+
+    status = await chat_engine_service.start_session(
+        stream_target=stream_target,
+        source_type=source_type,
+        video_path=video_path,
+        config=config,
+    )
+    return {"status": "started", "session": status}
+
+
+@app.post("/api/chat-engine/stop")
+async def api_chat_engine_stop():
+    from .chat_engine import chat_engine_service
+    status = await chat_engine_service.stop_session()
+    return {"status": "stopped", "session": status}
+
+
+@app.post("/api/chat-engine/simulate")
+async def api_chat_engine_simulate(payload: dict = Body(default={})):
+    """Triggers an automated simulated stream chat session with hype bursts for demo and testing."""
+    from .chat_engine import SpikeDetectorConfig, chat_engine_service
+    video_path = payload.get("video_path")
+    if not video_path:
+        sample_p = DATA / "sample_real_video.mp4"
+        if sample_p.exists():
+            video_path = str(sample_p)
+
+    config = SpikeDetectorConfig(
+        sensitivity="high",
+        min_mps_threshold=2.0,
+        pre_roll_seconds=5.0,
+        post_roll_seconds=15.0,
+    )
+
+    status = await chat_engine_service.start_session(
+        stream_target="simulated_hype_stream",
+        source_type="simulated",
+        video_path=video_path,
+        config=config,
+    )
+    return {"status": "simulation_started", "session": status}
+
