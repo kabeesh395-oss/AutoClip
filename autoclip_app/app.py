@@ -480,6 +480,16 @@ def start_scheduler():
         _scheduler_started = True
 
 
+@app.on_event("shutdown")
+def stop_background_services():
+    try:
+        from .trend_hunter import trend_hunter_service
+        trend_hunter_service.job_queue.stop_worker()
+        trend_hunter_service.ranking_scheduler.stop()
+    except Exception:
+        pass
+
+
 @app.get("/api/jobs/{job_id}")
 def get_job(job_id: str):
     with lock:

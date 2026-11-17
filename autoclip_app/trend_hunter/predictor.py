@@ -35,6 +35,10 @@ class ViralMomentPredictor:
         # Tracking recent unique users
         self._recent_users: collections.deque[tuple[float, str]] = collections.deque(maxlen=500)
 
+    def update_weights(self, weights: AdaptiveWeights) -> None:
+        """Dynamically reconfigures prediction weights based on real-time feedback learning."""
+        self.weights = weights
+
     def record_chat_metric(self, timestamp: float, current_mps: float, author: str | None = None) -> None:
         """Feeds periodic time-stamped chat velocity observations."""
         self._mps_samples.append((timestamp, current_mps))

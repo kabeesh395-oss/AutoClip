@@ -284,8 +284,8 @@ def test_feedback_learner_adaptive_weights(temp_db_and_storage):
 
     rejected_weights = learner.load_weights()
     assert rejected_weights.sample_count == 2
-    # Rejection increases sensitivity bias to be more conservative
-    assert rejected_weights.sensitivity_bias > 0.0
+    # Rejection lowers sensitivity bias to be more conservative
+    assert rejected_weights.sensitivity_bias < updated_weights.sensitivity_bias
 
 
 def test_persistent_job_queue_and_resource_guard(temp_db_and_storage):
@@ -368,11 +368,83 @@ def test_autonomous_workflow_levels(temp_db_and_storage):
 
     # Reject publishing without copyright confirmed
     with pytest.raises(Exception) as exc:
-        asyncio.run(service.approve_and_publish_clip(
+        service.approve_and_publish_clip(
             clip_id="clip_gate_test",
             copyright_confirmed=False,
-        ))
+        )
     assert "Copyright" in str(exc.value) or "permission" in str(exc.value) or "confirmed" in str(exc.value)
+
+    # Reject publishing a rejected clip even if copyright is confirmed
+    clip_rejected = ViralClipRecord(
+        clip_id="clip_rejected_test",
+        session_id="sess_gate",
+        channel_name="GateCreator",
+        platform="youtube",
+        stream_url="https://youtube.com/live/gate",
+        peak_time=120.0,
+        clip_start=100.0,
+        clip_end=160.0,
+        duration=60.0,
+        confidence_score=70.0,
+        demand_score=60.0,
+        raw_clip_path="",
+        shorts_clip_path="",
+        thumbnail_path="",
+        title="Rejected Moment",
+        description="Desc",
+        transcript="Speech dialogue",
+        status="REJECTED",
+    )
+    storage.add_clip(clip_rejected)
+
+    with pytest.raises(ValueError) as val_exc:
+        service.approve_and_publish_clip(
+            clip_id="clip_rejected_test",
+            copyright_confirmed=True,
+        )
+    assert "rejected" in str(val_exc.value).lower()
+
+
+def test_ai_feedback_directly_shifts_future_predictions(temp_db_and_storage):
+    db_file, storage = temp_db_and_storage
+    learner = FeedbackLearner(db_path=db_file)
+    predictor = ViralMomentPredictor(adaptive_weights=learner.current_weights)
+
+    # Initial prediction on marginal moment
+    res_before = predictor.predict_viral_moment(
+        current_mps=8.0,
+        baseline_mps=2.0,
+        audio_surge_db=3.0,
+        audio_max_db=-6.0,
+        viewer_growth_rate=2.0,
+        recent_transcript="good move here",
+        words_per_second=2.0,
+    )
+
+    # Now user rejects a similar clip with negative feedback
+    learner.record_feedback(
+        clip_id="clip_spam_1",
+        user_action="REJECTED",
+        features={"confidence_score": res_before.confidence_score, "audio_excitement_score": 60.0},
+        notes="False positive noise",
+    )
+
+    # Predictor updates with adapted weights
+    predictor.update_weights(learner.current_weights)
+
+    # Re-evaluate identical moment
+    res_after = predictor.predict_viral_moment(
+        current_mps=8.0,
+        baseline_mps=2.0,
+        audio_surge_db=3.0,
+        audio_max_db=-6.0,
+        viewer_growth_rate=2.0,
+        recent_transcript="good move here",
+        words_per_second=2.0,
+    )
+
+    # Assert prediction confidence score was lowered by the adaptive feedback
+    assert res_after.confidence_score < res_before.confidence_score
 
 
 def test_stream_disconnection_resilience(temp_db_and_storage):

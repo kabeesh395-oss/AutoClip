@@ -169,8 +169,8 @@ class FeedbackLearner:
                 w.w_speech_density = min(0.35, w.w_speech_density + (lr * 0.5))
                 logger.info("Adaptive tuning: dampening audio weight (-%.3f), boosting speech (+%.3f)", lr * 0.5, lr * 0.5)
 
-            # Increase sensitivity threshold to reduce future spam
-            w.sensitivity_bias = min(8.0, w.sensitivity_bias + 0.3)
+            # Rejections dampen baseline confidence to filter out marginal false positives
+            w.sensitivity_bias = max(-10.0, w.sensitivity_bias - 0.5)
 
         elif feedback.user_action in ("APPROVED", "PUBLISHED"):
             chat_score = f.get("chat_velocity_score", 50.0)
@@ -185,8 +185,8 @@ class FeedbackLearner:
             if feedback.views_count > 1000:
                 w.w_chatter_growth = min(0.25, w.w_chatter_growth + (lr * 0.2))
 
-            # Slightly lower threshold
-            w.sensitivity_bias = max(-6.0, w.sensitivity_bias - 0.2)
+            # Approvals boost future confidence for similar high-energy moments
+            w.sensitivity_bias = min(10.0, w.sensitivity_bias + 0.3)
 
         # Normalize weights so they sum to 1.0
         total = w.w_chat + w.w_chatter_growth + w.w_viewer_growth + w.w_audio + w.w_speech_density + w.w_transcript_keywords

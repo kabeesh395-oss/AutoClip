@@ -45,6 +45,7 @@ class LiveStreamMonitorSession:
         source_video_fallback: Path | None = None,
         is_simulation: bool = False,
         feedback_learner: FeedbackLearner | None = None,
+        job_queue: PersistentJobQueue | None = None,
     ) -> None:
         self.channel = channel
         self.storage = storage
@@ -52,6 +53,7 @@ class LiveStreamMonitorSession:
         self.source_video_fallback = source_video_fallback
         self.is_simulation = is_simulation
         self.feedback_learner = feedback_learner or FeedbackLearner(storage.db_path)
+        self.job_queue = job_queue
 
         self.session_id = f"sess_{uuid.uuid4().hex[:8]}"
         self.state = LiveSessionState(
@@ -245,6 +247,9 @@ class LiveStreamMonitorSession:
             return
 
         # 2. Multi-Signal Prediction & 'Why Selected' Rationale Generation
+        if self.feedback_learner:
+            self.predictor.update_weights(self.feedback_learner.current_weights)
+
         baseline_db = sum(self.audio_monitor._mean_volume_history) / max(1, len(self.audio_monitor._mean_volume_history)) if self.audio_monitor._mean_volume_history else -30.0
         audio_surge = self.audio_monitor.latest_mean_db - baseline_db
 
@@ -270,8 +275,22 @@ class LiveStreamMonitorSession:
 
         self._last_clip_peak_time = spike.peak_time
 
-        # 3. Schedule clip extraction and processing
-        asyncio.create_task(self._extract_viral_clip(spike, prediction))
+        # 3. Schedule clip extraction and processing via persistent queue or task
+        if self.job_queue:
+            clip_id = f"clip_{uuid.uuid4().hex[:8]}"
+            self.job_queue.enqueue(
+                session_id=self.session_id,
+                clip_id=clip_id,
+                job_type="EXTRACT_CLIP",
+                priority=10,
+                payload={
+                    "spike": spike.to_dict(),
+                    "prediction": prediction.to_dict(),
+                },
+            )
+            logger.info("Enqueued EXTRACT_CLIP job for clip %s to PersistentJobQueue", clip_id)
+        else:
+            asyncio.create_task(self._extract_viral_clip(spike, prediction))
 
     async def _extract_viral_clip(self, spike: SpikeEvent, prediction: PredictionResult) -> None:
         """

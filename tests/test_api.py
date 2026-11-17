@@ -185,9 +185,24 @@ def test_accessibility_and_file_transfer_endpoints():
     assert "btnExportZip" in static_html_res.text
 
     # 2. Test Download APK endpoint
-    apk_res = client.get("/api/download-apk")
-    assert apk_res.status_code == 200
-    assert apk_res.headers["content-type"] == "application/vnd.android.package-archive"
+    from autoclip_app.app import ROOT
+    apk_path = ROOT / "android-app" / "app" / "build" / "outputs" / "apk" / "debug" / "app-debug.apk"
+    apk_path.parent.mkdir(parents=True, exist_ok=True)
+    created_dummy_apk = False
+    if not apk_path.exists():
+        apk_path.write_bytes(b"PK\x03\x04dummy_android_package")
+        created_dummy_apk = True
+
+    try:
+        apk_res = client.get("/api/download-apk")
+        assert apk_res.status_code == 200
+        assert apk_res.headers["content-type"] == "application/vnd.android.package-archive"
+    finally:
+        if created_dummy_apk and apk_path.exists():
+            try:
+                apk_path.unlink()
+            except Exception:
+                pass
 
     # 3. Test Batch Source Upload
     batch_res = client.post("/api/batches", json={

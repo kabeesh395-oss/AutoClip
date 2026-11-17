@@ -36,11 +36,45 @@ class TrendHunterService:
         self.feedback_learner = FeedbackLearner(self.storage.db_path)
         self.ranker = ChannelRanker(storage=self.storage, discovery=self.discovery)
         self.job_queue = PersistentJobQueue(db_path=self.storage.db_path, resource_guard=ResourceGuard())
+        self.job_queue.register_handler("EXTRACT_CLIP", self._handle_extract_clip_job)
         self.ranking_scheduler = PeriodicRankingScheduler(self.ranker, refresh_interval_seconds=90.0)
 
         self.active_monitors: dict[str, LiveStreamMonitorSession] = {}
         self.default_config = TrendHunterConfig()
         self._is_running = False
+
+    async def _handle_extract_clip_job(self, job: JobQueueItem) -> None:
+        """Processes an extraction job dispatched by the persistent SQLite job queue."""
+        payload = job.payload or {}
+        session_id = job.session_id
+        monitor = self.active_monitors.get(session_id)
+        if not monitor:
+            logger.warning("Job %s: session %s no longer in active monitors", job.job_id, session_id)
+            return
+
+        spike_data = payload.get("spike", {})
+        pred_data = payload.get("prediction", {})
+        from .detector import SpikeEvent
+        from .models import PredictionResult
+
+        spike = SpikeEvent(
+            peak_time=float(spike_data.get("peak_time", 0.0)),
+            peak_mps=float(spike_data.get("peak_mps", 0.0)),
+            baseline_mps=float(spike_data.get("baseline_mps", 1.0)),
+            z_score=float(spike_data.get("z_score", 2.0)),
+            clip_start=float(spike_data.get("clip_start", 0.0)),
+            clip_end=float(spike_data.get("clip_end", 30.0)),
+            dominant_keywords=spike_data.get("dominant_keywords", []),
+        )
+        prediction = PredictionResult(
+            confidence_score=float(pred_data.get("confidence_score", 75.0)),
+            rationale=str(pred_data.get("rationale", "")),
+            signals=pred_data.get("signals", {}),
+            is_early_prediction=bool(pred_data.get("is_early_prediction", False)),
+            acceleration=float(pred_data.get("acceleration", 0.0)),
+        )
+
+        await monitor._extract_viral_clip(spike, prediction)
 
     def initialize_default_channels(self) -> None:
         """Seeds default curated trending streamers into the database if empty."""
@@ -126,6 +160,7 @@ class TrendHunterService:
             source_video_fallback=source_video_fallback,
             is_simulation=is_simulation,
             feedback_learner=self.feedback_learner,
+            job_queue=self.job_queue,
         )
         self.active_monitors[channel_id] = monitor
         state = await monitor.start()
@@ -189,6 +224,9 @@ class TrendHunterService:
         clip = self.storage.get_clip(clip_id)
         if not clip:
             raise ValueError(f"Clip not found: {clip_id}")
+
+        if clip.status == "REJECTED":
+            raise ValueError(f"Cannot publish rejected clip '{clip_id}'. Restore or re-process first.")
 
         clip_path = Path(clip.shorts_clip_path or clip.raw_clip_path)
         if not clip_path.exists():
