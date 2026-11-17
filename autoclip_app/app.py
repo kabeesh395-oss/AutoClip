@@ -468,6 +468,12 @@ def start_scheduler():
     with _db():
         pass
     init_batch_tables()
+    try:
+        from .trend_hunter import init_trend_tables, trend_hunter_service
+        init_trend_tables()
+        trend_hunter_service.initialize_default_channels()
+    except Exception as exc:
+        logger.warning("Trend hunter init warning: %s", exc)
     get_batch_worker().start()
     if not _scheduler_started:
         threading.Thread(target=_scheduled_worker, name="autoclip-scheduler", daemon=True).start()
@@ -1255,4 +1261,177 @@ async def api_chat_engine_simulate(payload: dict = Body(default={})):
         config=config,
     )
     return {"status": "simulation_started", "session": status}
+
+
+# =============================================================================
+# TREND HUNTER & VIRAL CLIP EXTRACTION ENGINE ENDPOINTS
+# =============================================================================
+
+@app.get("/api/trend-hunter/status")
+def api_trend_hunter_status():
+    from .trend_hunter import trend_hunter_service
+    return trend_hunter_service.get_global_status()
+
+
+@app.get("/api/trend-hunter/channels")
+def api_trend_hunter_channels():
+    from .trend_hunter import trend_hunter_service
+    return {"channels": trend_hunter_service.list_tracked_channels()}
+
+
+@app.post("/api/trend-hunter/channels")
+def api_trend_hunter_add_channel(payload: dict = Body(...)):
+    from .trend_hunter import trend_hunter_service
+    query = str(payload.get("query") or payload.get("channel") or "").strip()
+    platform = payload.get("platform")
+    if not query:
+        raise HTTPException(400, "Channel query or URL is required.")
+    ch = trend_hunter_service.add_channel(query, platform=platform)
+    return {"status": "added", "channel": ch}
+
+
+@app.delete("/api/trend-hunter/channels/{channel_id}")
+def api_trend_hunter_delete_channel(channel_id: str):
+    from .trend_hunter import trend_hunter_service
+    success = trend_hunter_service.remove_channel(channel_id)
+    if not success:
+        raise HTTPException(404, f"Channel not found: {channel_id}")
+    return {"status": "deleted", "channel_id": channel_id}
+
+
+@app.post("/api/trend-hunter/channels/search")
+def api_trend_hunter_search(payload: dict = Body(...)):
+    from .trend_hunter import trend_hunter_service
+    query = str(payload.get("query") or "").strip()
+    platform = payload.get("platform")
+    results = trend_hunter_service.search_channels(query, platform=platform)
+    return {"results": results}
+
+
+@app.post("/api/trend-hunter/monitor/start")
+async def api_trend_hunter_start_monitor(payload: dict = Body(...)):
+    from .trend_hunter import TrendHunterConfig, trend_hunter_service
+    channel_id = str(payload.get("channel_id") or "").strip()
+    if not channel_id:
+        raise HTTPException(400, "channel_id is required.")
+
+    cfg = TrendHunterConfig(
+        sensitivity=payload.get("sensitivity", "medium"),
+        pre_roll_seconds=float(payload.get("pre_roll_seconds", 20.0)),
+        post_roll_seconds=float(payload.get("post_roll_seconds", 40.0)),
+        min_confidence=float(payload.get("min_confidence", 60.0)),
+        layout=payload.get("layout", "9:16"),
+        caption_style=payload.get("caption_style", "KINETIC_YELLOW"),
+        auto_publish=bool(payload.get("auto_publish", False)),
+    )
+
+    video_fallback = payload.get("source_video_fallback")
+    fallback_path = Path(video_fallback) if video_fallback else None
+    is_simulation = bool(payload.get("is_simulation", False))
+
+    try:
+        session = await trend_hunter_service.start_monitoring(
+            channel_id=channel_id,
+            config=cfg,
+            source_video_fallback=fallback_path,
+            is_simulation=is_simulation,
+        )
+        return {"status": "monitoring_started", "session": session}
+    except Exception as exc:
+        raise HTTPException(500, f"Failed to start monitoring: {exc}")
+
+
+@app.post("/api/trend-hunter/monitor/stop")
+async def api_trend_hunter_stop_monitor(payload: dict = Body(...)):
+    from .trend_hunter import trend_hunter_service
+    channel_id = str(payload.get("channel_id") or "").strip()
+    if not channel_id:
+        raise HTTPException(400, "channel_id is required.")
+    session = await trend_hunter_service.stop_monitoring(channel_id)
+    return {"status": "monitoring_stopped", "session": session}
+
+
+@app.get("/api/trend-hunter/review-queue")
+def api_trend_hunter_review_queue(status: str | None = None, limit: int = 50):
+    from .trend_hunter import trend_hunter_service
+    clips = trend_hunter_service.list_review_queue(status=status, limit=limit)
+    return {"clips": clips}
+
+
+@app.post("/api/trend-hunter/clips/{clip_id}/approve-and-publish")
+def api_trend_hunter_publish(clip_id: str, payload: dict = Body(default={})):
+    from .trend_hunter import trend_hunter_service
+    copyright_confirmed = bool(payload.get("copyright_confirmed", False))
+    if not copyright_confirmed:
+        raise HTTPException(400, "You must confirm copyright / permission rights before publishing.")
+    try:
+        res = trend_hunter_service.approve_and_publish_clip(clip_id, copyright_confirmed=True)
+        return res
+    except Exception as exc:
+        raise HTTPException(500, f"Publishing failed: {exc}")
+
+
+@app.post("/api/trend-hunter/clips/{clip_id}/reject")
+def api_trend_hunter_reject(clip_id: str):
+    from .trend_hunter import trend_hunter_service
+    success = trend_hunter_service.reject_clip(clip_id)
+    return {"status": "rejected" if success else "failed", "clip_id": clip_id}
+
+
+@app.post("/api/trend-hunter/clips/{clip_id}/update")
+def api_trend_hunter_update_clip(clip_id: str, payload: dict = Body(...)):
+    from .trend_hunter import trend_hunter_service
+    title = payload.get("title")
+    description = payload.get("description")
+    success = trend_hunter_service.update_clip_metadata(clip_id, title=title, description=description)
+    return {"status": "updated" if success else "failed", "clip_id": clip_id}
+
+
+@app.post("/api/trend-hunter/simulate")
+async def api_trend_hunter_simulate(payload: dict = Body(default={})):
+    """Triggers an automated simulated live monitoring session with synthetic hype burst."""
+    from .trend_hunter import TrendHunterConfig, trend_hunter_service
+    channel_name = payload.get("channel_name", "IShowSpeed")
+    platform = payload.get("platform", "youtube")
+    channel_id = f"ch_sim_{channel_name.lower()}"
+
+    # Ensure channel exists
+    channel = trend_hunter_service.storage.get_channel(channel_id)
+    if not channel:
+        from .trend_hunter import ChannelProfile
+        channel = ChannelProfile(
+            id=channel_id,
+            channel_name=channel_name,
+            platform=platform,
+            channel_url=f"https://www.{platform}.com/@{channel_name}",
+            is_live=True,
+            current_viewers=85000,
+            demand_score=94.5,
+            stream_title=f"🔴 {channel_name} LIVE STREAM HYPES",
+            category="IRL & Gaming",
+        )
+        trend_hunter_service.storage.upsert_channel(channel)
+
+    video_path = payload.get("video_path")
+    fallback_p = Path(video_path) if video_path else None
+    if not fallback_p:
+        cand_p = DATA / "sample_real_video.mp4"
+        if cand_p.exists():
+            fallback_p = cand_p
+
+    cfg = TrendHunterConfig(
+        sensitivity="high",
+        pre_roll_seconds=float(payload.get("pre_roll_seconds", 5.0)),
+        post_roll_seconds=float(payload.get("post_roll_seconds", 15.0)),
+        min_confidence=50.0,
+    )
+
+    session = await trend_hunter_service.start_monitoring(
+        channel_id=channel_id,
+        config=cfg,
+        source_video_fallback=fallback_p,
+        is_simulation=True,
+    )
+    return {"status": "simulation_started", "session": session}
+
 

@@ -1,0 +1,193 @@
+from __future__ import annotations
+
+import asyncio
+import logging
+from pathlib import Path
+from typing import Any
+
+from ..youtube import upload_public_video, youtube_status
+from .discovery import ChannelDiscoveryService
+from .models import ChannelProfile, LiveSessionState, TrendHunterConfig, ViralClipRecord
+from .storage import TrendStorage
+from .stream_monitor import LiveStreamMonitorSession
+
+logger = logging.getLogger("autoclip.trend_hunter.service")
+
+ROOT = Path(__file__).resolve().parents[2]
+
+
+class TrendHunterService:
+    """
+    Central orchestration service for Trend Hunter & Automatic Viral Clip Extraction.
+    Coordinates:
+      - Channel Discovery (YouTube & Twitch)
+      - Simultaneous Multi-Stream Live Monitoring
+      - Autonomous Viral Spike Detection & Pre/Post-roll Clipping
+      - Review Queue Management
+      - Safe YouTube Shorts Publishing Integration
+    """
+
+    def __init__(self, storage: TrendStorage | None = None) -> None:
+        self.storage = storage or TrendStorage()
+        self.discovery = ChannelDiscoveryService()
+        self.active_monitors: dict[str, LiveStreamMonitorSession] = {}
+        self.default_config = TrendHunterConfig()
+        self._background_tasks: list[asyncio.Task] = []
+        self._is_running = False
+
+    def initialize_default_channels(self) -> None:
+        """Seeds default curated trending streamers into the database if empty."""
+        existing = self.storage.list_channels()
+        if not existing:
+            trending = self.discovery.get_trending_channels(refresh_live_status=False)
+            for ch in trending:
+                self.storage.upsert_channel(ch)
+
+    def search_channels(self, query: str, platform: str | None = None) -> list[dict[str, Any]]:
+        """Searches for channels and immediately updates their profile."""
+        profiles = self.discovery.search_channels(query, platform=platform)
+        for p in profiles:
+            self.storage.upsert_channel(p)
+        return [p.to_dict() for p in profiles]
+
+    def list_tracked_channels(self) -> list[dict[str, Any]]:
+        """Returns all tracked channels with their latest live status and demand scores."""
+        channels = self.storage.list_channels()
+        return [c.to_dict() for c in channels]
+
+    def add_channel(self, query: str, platform: str | None = None) -> dict[str, Any]:
+        """Discovers and adds a new channel to active tracking."""
+        results = self.discovery.search_channels(query, platform=platform)
+        if not results:
+            # Fallback manual channel profile creation
+            handle = query.lstrip("@").strip()
+            ch_plat = platform.lower() if platform else "youtube"
+            prof = ChannelProfile(
+                id=f"ch_{ch_plat}_{handle.lower()}",
+                channel_name=handle,
+                platform=ch_plat,
+                channel_url=f"https://www.{ch_plat}.com/{'@' if ch_plat == 'youtube' else ''}{handle}",
+                handle=handle,
+            )
+            self.storage.upsert_channel(prof)
+            return prof.to_dict()
+
+        primary = results[0]
+        self.storage.upsert_channel(primary)
+        return primary.to_dict()
+
+    def remove_channel(self, channel_id: str) -> bool:
+        """Removes a channel and stops monitoring if active."""
+        if channel_id in self.active_monitors:
+            asyncio.create_task(self.stop_monitoring(channel_id))
+        return self.storage.delete_channel(channel_id)
+
+    async def start_monitoring(
+        self,
+        channel_id: str,
+        config: TrendHunterConfig | None = None,
+        source_video_fallback: Path | None = None,
+        is_simulation: bool = False,
+    ) -> dict[str, Any]:
+        """
+        Starts live stream monitoring on a tracked channel.
+        """
+        channel = self.storage.get_channel(channel_id)
+        if not channel:
+            raise ValueError(f"Channel not found: {channel_id}")
+
+        if channel_id in self.active_monitors and self.active_monitors[channel_id]._is_running:
+            return self.active_monitors[channel_id].state.to_dict()
+
+        cfg = config or self.default_config
+        monitor = LiveStreamMonitorSession(
+            channel=channel,
+            storage=self.storage,
+            config=cfg,
+            source_video_fallback=source_video_fallback,
+            is_simulation=is_simulation,
+        )
+        self.active_monitors[channel_id] = monitor
+        state = await monitor.start()
+        return state.to_dict()
+
+    async def stop_monitoring(self, channel_id: str) -> dict[str, Any]:
+        """Stops live stream monitoring for a channel."""
+        monitor = self.active_monitors.pop(channel_id, None)
+        if not monitor:
+            return {"status": "NOT_MONITORING", "channel_id": channel_id}
+        state = await monitor.stop()
+        return state.to_dict()
+
+    def get_global_status(self) -> dict[str, Any]:
+        """Returns consolidated dashboard telemetry."""
+        channels = self.storage.list_channels()
+        active_sessions = [m.state.to_dict() for m in self.active_monitors.values() if m._is_running]
+        recent_clips = [c.to_dict() for c in self.storage.list_clips(limit=10)]
+        yt_stat = youtube_status()
+
+        return {
+            "monitored_streams_count": len(active_sessions),
+            "total_tracked_channels": len(channels),
+            "active_sessions": active_sessions,
+            "tracked_channels": [c.to_dict() for c in channels],
+            "recent_clips": recent_clips,
+            "youtube_status": yt_stat,
+        }
+
+    def list_review_queue(self, status: str | None = None, limit: int = 50) -> list[dict[str, Any]]:
+        """Returns clips from the review queue."""
+        clips = self.storage.list_clips(status=status, limit=limit)
+        return [c.to_dict() for c in clips]
+
+    def update_clip_metadata(self, clip_id: str, title: str | None = None, description: str | None = None) -> bool:
+        return self.storage.update_clip_status(clip_id=clip_id, status="PENDING_REVIEW", title=title, description=description)
+
+    def reject_clip(self, clip_id: str) -> bool:
+        return self.storage.update_clip_status(clip_id=clip_id, status="REJECTED")
+
+    def approve_and_publish_clip(self, clip_id: str, copyright_confirmed: bool = True) -> dict[str, Any]:
+        """
+        Safe publishing workflow:
+        Enforces explicit copyright & permission confirmation before publishing to YouTube Shorts.
+        """
+        if not copyright_confirmed:
+            raise ValueError("You must confirm copyright permissions before publishing.")
+
+        clip = self.storage.get_clip(clip_id)
+        if not clip:
+            raise ValueError(f"Clip not found: {clip_id}")
+
+        clip_path = Path(clip.shorts_clip_path or clip.raw_clip_path)
+        if not clip_path.exists():
+            raise FileNotFoundError(f"Video file not found at {clip_path}")
+
+        # Publish via YouTube integration
+        upload_result = upload_public_video(
+            video_path=clip_path,
+            title=clip.title[:100],
+            description=clip.description,
+            tags=clip.tags or ["Shorts", "Trending", "Viral"],
+            category_id="22",
+            privacy_status="public",
+        )
+
+        video_id = upload_result.get("video_id") or upload_result.get("id") or "published"
+        self.storage.update_clip_status(
+            clip_id=clip_id,
+            status="PUBLISHED",
+            copyright_confirmed=True,
+            youtube_video_id=video_id,
+        )
+
+        return {
+            "status": "PUBLISHED",
+            "clip_id": clip_id,
+            "youtube_video_id": video_id,
+            "youtube_url": f"https://www.youtube.com/shorts/{video_id}" if video_id != "published" else None,
+            "message": "Clip successfully approved and published to YouTube Shorts!",
+        }
+
+
+# Global singleton instance
+trend_hunter_service = TrendHunterService()

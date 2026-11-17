@@ -136,6 +136,11 @@
           <span>Chat Spikes</span>
           <span id="navChatSpikesBadge" class="hidden font-mono text-[9px] bg-red-600/30 text-red-400 px-1.5 py-0.2 rounded-full font-bold animate-pulse">LIVE</span>
         </button>
+        <button data-tab="tab-trend-hunter" class="nav-btn flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-text-muted hover:text-white font-headline text-xs font-medium transition-colors">
+          <span class="material-symbols-outlined text-[17px] text-amber-400">radar</span>
+          <span>Trend Hunter</span>
+          <span id="navTrendHunterBadge" class="hidden font-mono text-[9px] bg-amber-500/30 text-amber-300 px-1.5 py-0.2 rounded-full font-bold animate-pulse">LIVE</span>
+        </button>
         <button data-tab="tab-settings" class="nav-btn flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-text-muted hover:text-white font-headline text-xs font-medium transition-colors">
           <span class="material-symbols-outlined text-[17px]">settings</span>
           <span>Settings</span>
@@ -554,6 +559,217 @@
         </div>
       </section>
     </div>
+
+    <!-- ========================================================================= -->
+    <!-- TAB 6: TREND HUNTER & AUTOMATIC VIRAL CLIP EXTRACTION                     -->
+    <!-- ========================================================================= -->
+    <div id="tab-trend-hunter" class="tab-content hidden space-y-6">
+
+      <!-- Header & Global Telemetry Stats -->
+      <section class="bg-gradient-to-r from-amber-500/10 via-surface to-red-500/10 border border-amber-500/20 rounded-3xl p-5 sm:p-7 relative overflow-hidden">
+        <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-6 relative z-10">
+          <div class="space-y-2 max-w-2xl">
+            <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-amber-500/15 border border-amber-500/30 text-amber-300 font-mono text-[11px] font-bold">
+              <span class="w-2 h-2 rounded-full bg-amber-400 animate-pulse"></span>
+              <span>AUTONOMOUS TREND HUNTER ENGINE</span>
+            </div>
+            <h2 class="font-headline text-2xl sm:text-3xl font-extrabold text-white tracking-tight">
+              Trend Hunter & Viral Stream Snatcher
+            </h2>
+            <p class="text-xs sm:text-sm text-text-muted leading-relaxed">
+              Discovers high-demand YouTube & Twitch channels, monitors rolling live buffers, fuses multi-modal signals (Chat MPS + Audio Loudness + Viewers), and extracts Shorts-ready 9:16 clips autonomously with Faster-Whisper & Opus kinetic subtitles.
+            </p>
+          </div>
+
+          <!-- Quick Test Simulation Button -->
+          <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+            <button onclick="runTrendHunterSimulation()" class="px-5 py-3 rounded-2xl bg-gradient-to-r from-amber-500 to-red-600 hover:brightness-110 text-white font-headline text-xs font-bold shadow-lg transition-all flex items-center justify-center gap-2">
+              <span class="material-symbols-outlined text-[18px]">play_circle</span>
+              <span>1-Click Test Hype Stream (IShowSpeed)</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Telemetry Counters Grid -->
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mt-6 pt-6 border-t border-border/60">
+          <div class="bg-surface-low/80 p-3.5 rounded-2xl border border-border">
+            <div class="text-[10px] font-mono text-text-subtle uppercase tracking-wider">Active Monitored Streams</div>
+            <div id="thMetricMonitoredStreams" class="text-xl sm:text-2xl font-headline font-black text-amber-400 mt-1">0</div>
+          </div>
+          <div class="bg-surface-low/80 p-3.5 rounded-2xl border border-border">
+            <div class="text-[10px] font-mono text-text-subtle uppercase tracking-wider">Tracked Channels</div>
+            <div id="thMetricTrackedChannels" class="text-xl sm:text-2xl font-headline font-black text-white mt-1">0</div>
+          </div>
+          <div class="bg-surface-low/80 p-3.5 rounded-2xl border border-border">
+            <div class="text-[10px] font-mono text-text-subtle uppercase tracking-wider">Peak Demand Score</div>
+            <div id="thMetricHighestDemand" class="text-xl sm:text-2xl font-headline font-black text-tertiary mt-1">--</div>
+          </div>
+          <div class="bg-surface-low/80 p-3.5 rounded-2xl border border-border">
+            <div class="text-[10px] font-mono text-text-subtle uppercase tracking-wider">Extracted Viral Clips</div>
+            <div id="thMetricClipsExtracted" class="text-xl sm:text-2xl font-headline font-black text-secondary mt-1">0</div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Channel Discovery & Search Bar -->
+      <section class="bg-surface-low border border-border rounded-3xl p-5 sm:p-6 space-y-4">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-border/60 pb-3">
+          <div class="space-y-0.5">
+            <h3 class="font-headline text-base sm:text-lg font-bold text-white flex items-center gap-2">
+              <span class="material-symbols-outlined text-amber-400 text-[20px]">explore</span>
+              <span>Channel Discovery & Demand Radar</span>
+            </h3>
+            <p class="text-xs text-text-muted">Enter any creator name (e.g. "IShowSpeed"), @handle, or Twitch/YouTube stream URL.</p>
+          </div>
+        </div>
+
+        <div class="flex flex-col md:flex-row items-stretch gap-3">
+          <div class="relative flex-1">
+            <span class="material-symbols-outlined absolute left-3.5 top-3.5 text-text-subtle text-[18px]">search</span>
+            <input id="thSearchInput" type="text" placeholder="Search channel name, @handle, or live URL (e.g. IShowSpeed, KaiCenat, tarik)..."
+              class="w-full bg-surface border border-border focus:border-amber-400 pl-10 pr-4 py-3 rounded-2xl text-xs sm:text-sm text-white placeholder-text-subtle focus:outline-none transition-colors"
+              onkeydown="if(event.key==='Enter') searchOrAddChannel()" />
+          </div>
+
+          <div class="flex items-center gap-2">
+            <select id="thPlatformSelect" class="bg-surface border border-border rounded-2xl px-3 py-3 text-xs font-headline font-medium text-white focus:outline-none focus:border-amber-400">
+              <option value="all">All Platforms</option>
+              <option value="youtube">YouTube</option>
+              <option value="twitch">Twitch</option>
+            </select>
+
+            <select id="thSensitivitySelect" class="bg-surface border border-border rounded-2xl px-3 py-3 text-xs font-headline font-medium text-white focus:outline-none focus:border-amber-400">
+              <option value="medium">Medium (2.2σ)</option>
+              <option value="high">High (1.6σ More Clips)</option>
+              <option value="low">Low (3.0σ Mega Hypes)</option>
+            </select>
+
+            <button onclick="searchOrAddChannel()" class="px-5 py-3 rounded-2xl bg-amber-500 hover:bg-amber-400 text-black font-headline text-xs font-bold shadow-md transition-all flex items-center gap-1.5 whitespace-nowrap">
+              <span class="material-symbols-outlined text-[17px]">radar</span>
+              <span>Discover & Track</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Quick Trending Preset Chips -->
+        <div class="flex items-center gap-2 flex-wrap pt-1 text-xs">
+          <span class="text-text-subtle font-medium">Trending Live Seeds:</span>
+          <button onclick="quickAddChannel('IShowSpeed', 'youtube')" class="px-3 py-1 rounded-full bg-surface border border-border hover:border-red-500/50 text-text-muted hover:text-white font-mono text-[11px] transition-colors flex items-center gap-1">
+            <span class="w-1.5 h-1.5 rounded-full bg-red-500"></span>
+            <span>IShowSpeed (YouTube)</span>
+          </button>
+          <button onclick="quickAddChannel('kaicenat', 'twitch')" class="px-3 py-1 rounded-full bg-surface border border-border hover:border-purple-500/50 text-text-muted hover:text-white font-mono text-[11px] transition-colors flex items-center gap-1">
+            <span class="w-1.5 h-1.5 rounded-full bg-purple-500"></span>
+            <span>KaiCenat (Twitch)</span>
+          </button>
+          <button onclick="quickAddChannel('tarik', 'twitch')" class="px-3 py-1 rounded-full bg-surface border border-border hover:border-purple-500/50 text-text-muted hover:text-white font-mono text-[11px] transition-colors flex items-center gap-1">
+            <span class="w-1.5 h-1.5 rounded-full bg-purple-500"></span>
+            <span>tarik (Twitch)</span>
+          </button>
+          <button onclick="quickAddChannel('xqc', 'twitch')" class="px-3 py-1 rounded-full bg-surface border border-border hover:border-purple-500/50 text-text-muted hover:text-white font-mono text-[11px] transition-colors flex items-center gap-1">
+            <span class="w-1.5 h-1.5 rounded-full bg-purple-500"></span>
+            <span>xQc (Twitch)</span>
+          </button>
+          <button onclick="quickAddChannel('LofiGirl', 'youtube')" class="px-3 py-1 rounded-full bg-surface border border-border hover:border-red-500/50 text-text-muted hover:text-white font-mono text-[11px] transition-colors flex items-center gap-1">
+            <span class="w-1.5 h-1.5 rounded-full bg-red-500"></span>
+            <span>Lofi Girl (YouTube)</span>
+          </button>
+        </div>
+      </section>
+
+      <!-- Active Stream Live Monitor Cockpit (Real-time telemetry) -->
+      <section id="thActiveCockpit" class="hidden bg-surface-low border border-amber-500/30 rounded-3xl p-5 sm:p-6 space-y-4">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-border/60 pb-3">
+          <div class="flex items-center gap-3">
+            <span class="w-3 h-3 rounded-full bg-red-500 animate-ping"></span>
+            <div>
+              <div class="flex items-center gap-2">
+                <h3 id="thActiveChannelTitle" class="font-headline text-base sm:text-lg font-bold text-white">Live Monitoring Stream</h3>
+                <span class="font-mono text-[10px] px-2 py-0.5 rounded-full bg-red-600/20 text-red-400 border border-red-500/30 font-bold uppercase">RECORDING 5M BUFFER</span>
+              </div>
+              <p id="thActiveStreamUrl" class="text-xs text-text-muted font-mono truncate max-w-md">https://...</p>
+            </div>
+          </div>
+          <button onclick="stopActiveMonitoring()" class="px-4 py-2 rounded-xl bg-surface-card hover:bg-surface border border-red-500/40 text-red-400 hover:text-red-300 font-headline text-xs font-semibold transition-colors flex items-center gap-1">
+            <span class="material-symbols-outlined text-[16px]">stop_circle</span>
+            <span>Stop Monitoring</span>
+          </button>
+        </div>
+
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-3 text-xs font-mono">
+          <div class="bg-surface p-3 rounded-2xl border border-border space-y-1">
+            <div class="text-[10px] text-text-subtle">Rolling Buffer Stored</div>
+            <div id="thBufferDuration" class="text-base font-bold text-tertiary">0.0s / 300s</div>
+            <div class="text-[9px] text-text-subtle font-sans">Pre-roll 20s preserved</div>
+          </div>
+          <div class="bg-surface p-3 rounded-2xl border border-border space-y-1">
+            <div class="text-[10px] text-text-subtle">Live Chat Rate</div>
+            <div id="thLiveMps" class="text-base font-bold text-red-400">0.0 MPS</div>
+            <div class="w-full bg-surface-high h-1.5 rounded-full overflow-hidden mt-1">
+              <div id="thMpsBar" class="bg-red-500 h-full w-0 transition-all duration-300"></div>
+            </div>
+          </div>
+          <div class="bg-surface p-3 rounded-2xl border border-border space-y-1">
+            <div class="text-[10px] text-text-subtle">Audio Level & Surge</div>
+            <div id="thAudioLevel" class="text-base font-bold text-secondary">-40.0 dB</div>
+            <div class="text-[9px] text-text-subtle font-sans">Detects yelling / hypes</div>
+          </div>
+          <div class="bg-surface p-3 rounded-2xl border border-border space-y-1">
+            <div class="text-[10px] text-text-subtle">Live Demand Score</div>
+            <div id="thDemandScore" class="text-base font-bold text-amber-400">0/100</div>
+            <div class="text-[9px] text-text-subtle font-sans">Multi-signal fused</div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Discovered & Tracked Channels Grid -->
+      <section class="space-y-4">
+        <div class="flex items-center justify-between">
+          <div class="flex items-center gap-2">
+            <span class="material-symbols-outlined text-secondary text-[20px]">view_list</span>
+            <h3 class="font-headline text-base sm:text-lg font-bold text-white">Tracked & Discovered Channels</h3>
+          </div>
+          <button onclick="loadTrendHunterData()" class="text-xs font-headline text-secondary hover:underline flex items-center gap-1">
+            <span class="material-symbols-outlined text-[15px]">refresh</span>
+            <span>Refresh Live Status</span>
+          </button>
+        </div>
+
+        <div id="thChannelsContainer" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          <div class="p-8 text-center bg-surface-low border border-dashed border-border rounded-2xl text-text-muted text-xs col-span-full">
+            Loading tracked channels...
+          </div>
+        </div>
+      </section>
+
+      <!-- Viral Shorts Review & Safe Publishing Queue -->
+      <section class="space-y-4 pt-2">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-border/60 pb-3">
+          <div class="space-y-0.5">
+            <div class="flex items-center gap-2">
+              <span class="material-symbols-outlined text-red-500 text-[22px]">video_camera_front</span>
+              <h3 class="font-headline text-base sm:text-lg font-bold text-white">Viral Shorts Review & Publishing Queue</h3>
+              <span id="thReviewQueueBadge" class="font-mono text-[10px] px-2 py-0.5 rounded-full bg-secondary/20 text-secondary border border-secondary/30 font-bold">0 Pending</span>
+            </div>
+            <p class="text-xs text-text-muted">High-energy moments extracted from rolling buffer, formatted into 9:16 Shorts with subtitles. Review and publish with 1 click.</p>
+          </div>
+
+          <!-- Filter buttons -->
+          <div class="flex items-center gap-1.5 bg-surface p-1 rounded-xl border border-border text-xs font-headline">
+            <button onclick="filterReviewQueue('ALL')" class="th-filter-btn px-3 py-1 rounded-lg bg-surface-high text-white font-semibold">All</button>
+            <button onclick="filterReviewQueue('PENDING_REVIEW')" class="th-filter-btn px-3 py-1 rounded-lg text-text-muted hover:text-white">Pending</button>
+            <button onclick="filterReviewQueue('PUBLISHED')" class="th-filter-btn px-3 py-1 rounded-lg text-text-muted hover:text-white">Published</button>
+          </div>
+        </div>
+
+        <div id="thReviewQueueContainer" class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          <div class="p-8 text-center bg-surface-low border border-dashed border-border rounded-2xl text-text-muted text-xs col-span-full">
+            No viral clips extracted yet. Channels monitored in live mode will automatically extract moments here once confidence thresholds are reached.
+          </div>
+        </div>
+      </section>
+
+    </div>
   </main>
 
   <!-- ========================================================================= -->
@@ -602,6 +818,10 @@
     <button onclick="switchTab('tab-chat')" class="mobile-nav-btn flex flex-col items-center py-1 px-2 text-text-muted hover:text-white transition-colors" data-mobtab="tab-chat">
       <span class="material-symbols-outlined text-[20px]">forum</span>
       <span class="text-[10px] font-headline font-medium mt-0.5">Chat Spikes</span>
+    </button>
+    <button onclick="switchTab('tab-trend-hunter')" class="mobile-nav-btn flex flex-col items-center py-1 px-2 text-text-muted hover:text-white transition-colors" data-mobtab="tab-trend-hunter">
+      <span class="material-symbols-outlined text-[20px] text-amber-400">radar</span>
+      <span class="text-[10px] font-headline font-medium mt-0.5">Trend Hunter</span>
     </button>
     <button onclick="switchTab('tab-settings')" class="mobile-nav-btn flex flex-col items-center py-1 px-2 text-text-muted hover:text-white transition-colors" data-mobtab="tab-settings">
       <span class="material-symbols-outlined text-[20px]">settings</span>
@@ -801,6 +1021,10 @@
       });
 
       if (tabId === 'tab-settings') refreshServerLogs();
+      if (tabId === 'tab-trend-hunter') {
+        loadTrendHunterData();
+        startTrendHunterPolling();
+      }
     }
 
     document.querySelectorAll('.nav-btn').forEach(btn => {
@@ -1796,6 +2020,426 @@
       }).join('');
     }
 
+    // =========================================================================
+    // TREND HUNTER & AUTOMATIC VIRAL CLIP EXTRACTION FRONTEND LOGIC
+    // =========================================================================
+    let trendHunterPollTimer = null;
+    let currentReviewFilter = 'ALL';
+    let cachedReviewClips = [];
+
+    function startTrendHunterPolling() {
+      if (trendHunterPollTimer) clearInterval(trendHunterPollTimer);
+      trendHunterPollTimer = setInterval(pollTrendHunterStatus, 2500);
+      pollTrendHunterStatus();
+    }
+
+    async function pollTrendHunterStatus() {
+      try {
+        const res = await fetch('/api/trend-hunter/status');
+        if (!res.ok) return;
+        const data = await res.json();
+        updateTrendHunterDashboard(data);
+      } catch (e) {}
+    }
+
+    async function loadTrendHunterData() {
+      await pollTrendHunterStatus();
+      await refreshReviewQueue();
+    }
+
+    function updateTrendHunterDashboard(data) {
+      if (!data) return;
+
+      // Telemetry Counters
+      const countMonitored = data.monitored_streams_count || 0;
+      const countChannels = data.total_tracked_channels || (data.tracked_channels ? data.tracked_channels.length : 0);
+      document.getElementById('thMetricMonitoredStreams').textContent = countMonitored;
+      document.getElementById('thMetricTrackedChannels').textContent = countChannels;
+
+      const badge = document.getElementById('navTrendHunterBadge');
+      if (badge) badge.classList.toggle('hidden', countMonitored === 0);
+
+      // Highest demand score
+      let highestDemand = 0;
+      if (data.tracked_channels) {
+        data.tracked_channels.forEach(ch => {
+          if ((ch.demand_score || 0) > highestDemand) highestDemand = ch.demand_score;
+        });
+      }
+      document.getElementById('thMetricHighestDemand').textContent = highestDemand > 0 ? `${highestDemand.toFixed(0)}/100` : '--';
+
+      // Active Cockpit
+      const cockpit = document.getElementById('thActiveCockpit');
+      if (data.active_sessions && data.active_sessions.length > 0) {
+        cockpit.classList.remove('hidden');
+        const sess = data.active_sessions[0];
+        document.getElementById('thActiveChannelTitle').textContent = `🔴 Live: ${sess.channel_name} (${sess.platform.toUpperCase()})`;
+        document.getElementById('thActiveStreamUrl').textContent = sess.stream_url;
+        document.getElementById('thBufferDuration').textContent = `${(sess.buffer_duration_seconds || 0).toFixed(1)}s / 300s`;
+        document.getElementById('thLiveMps').textContent = `${(sess.current_mps || 0).toFixed(1)} MPS`;
+        document.getElementById('thAudioLevel').textContent = `${(sess.current_audio_db || -40).toFixed(1)} dB`;
+        document.getElementById('thDemandScore').textContent = `${(sess.current_demand_score || 0).toFixed(0)}/100`;
+
+        const mpsBar = document.getElementById('thMpsBar');
+        if (mpsBar) {
+          const pct = Math.min(100, Math.round(((sess.current_mps || 0) / 20.0) * 100));
+          mpsBar.style.width = `${pct}%`;
+        }
+      } else {
+        cockpit.classList.add('hidden');
+      }
+
+      // Render Tracked Channels
+      renderTrendChannels(data.tracked_channels || [], data.active_sessions || []);
+    }
+
+    function renderTrendChannels(channels, activeSessions) {
+      const cont = document.getElementById('thChannelsContainer');
+      if (!cont) return;
+      if (!channels || channels.length === 0) {
+        cont.innerHTML = `
+          <div class="p-8 text-center bg-surface-low border border-dashed border-border rounded-2xl text-text-muted text-xs col-span-full">
+            No tracked channels yet. Use the search bar above or click one of the trending seed chips (e.g. IShowSpeed, KaiCenat) to start monitoring!
+          </div>
+        `;
+        return;
+      }
+
+      const activeChannelIds = new Set(activeSessions.map(s => s.channel_id));
+
+      cont.innerHTML = channels.map(ch => {
+        const isLive = !!ch.is_live;
+        const isMonitored = activeChannelIds.has(ch.id);
+        const score = Math.round(ch.demand_score || 40);
+        const viewers = ch.current_viewers ? ch.current_viewers.toLocaleString() : 'Offline';
+        const isYt = ch.platform.toLowerCase() === 'youtube';
+
+        return `
+          <div class="bg-surface-low border ${isMonitored ? 'border-amber-500/50 shadow-amber-500/10' : 'border-border'} hover:border-amber-400/40 rounded-2xl p-4 sm:p-5 transition-all space-y-3.5 flex flex-col justify-between">
+            <div class="space-y-2">
+              <div class="flex items-center justify-between gap-2">
+                <div class="flex items-center gap-2">
+                  <span class="px-2 py-0.5 rounded-lg text-[10px] font-mono font-bold uppercase ${isYt ? 'bg-red-500/20 text-red-400 border border-red-500/30' : 'bg-purple-500/20 text-purple-400 border border-purple-500/30'}">
+                    ${ch.platform}
+                  </span>
+                  <span class="font-headline font-bold text-white text-sm sm:text-base">${ch.channel_name}</span>
+                </div>
+
+                <!-- Live Status Pill -->
+                <div class="flex items-center gap-1.5 px-2.5 py-0.5 rounded-full ${isLive ? 'bg-red-600/20 text-red-400 border border-red-500/30' : 'bg-surface text-text-subtle border border-border'} font-mono text-[10px] font-bold">
+                  <span class="w-2 h-2 rounded-full ${isLive ? 'bg-red-500 animate-pulse' : 'bg-text-subtle'}"></span>
+                  <span>${isLive ? 'LIVE' : 'OFFLINE'}</span>
+                </div>
+              </div>
+
+              <!-- Stream title & category -->
+              <p class="text-xs text-text-muted truncate">${ch.stream_title || ch.category || 'Streaming Live'}</p>
+
+              <!-- Demand Score & Viewers Bar -->
+              <div class="grid grid-cols-2 gap-2 text-xs font-mono pt-1">
+                <div class="bg-surface p-2 rounded-xl border border-border">
+                  <div class="text-[10px] text-text-subtle">Viewers</div>
+                  <div class="font-bold ${isLive ? 'text-white' : 'text-text-subtle'}">${viewers}</div>
+                </div>
+                <div class="bg-surface p-2 rounded-xl border border-border">
+                  <div class="text-[10px] text-text-subtle">Demand Score</div>
+                  <div class="font-bold ${score >= 80 ? 'text-tertiary' : score >= 60 ? 'text-amber-400' : 'text-text-muted'}">${score}/100</div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Action Buttons -->
+            <div class="flex items-center justify-between gap-2 pt-2 border-t border-border/60">
+              <button onclick="${isMonitored ? `stopChannelMonitoring('${ch.id}')` : `startChannelMonitoring('${ch.id}')`}"
+                class="flex-1 py-2 px-3 rounded-xl font-headline text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${isMonitored ? 'bg-red-600/20 hover:bg-red-600/30 text-red-400 border border-red-500/40' : 'bg-amber-500 hover:bg-amber-400 text-black shadow-md'}">
+                <span class="material-symbols-outlined text-[16px]">${isMonitored ? 'stop_circle' : 'radar'}</span>
+                <span>${isMonitored ? 'Stop Monitor' : 'Start Live Monitor'}</span>
+              </button>
+
+              <button onclick="deleteTrackedChannel('${ch.id}')" title="Remove Channel" class="p-2 rounded-xl bg-surface hover:bg-surface-high text-text-subtle hover:text-red-400 border border-border transition-colors">
+                <span class="material-symbols-outlined text-[16px]">delete</span>
+              </button>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    async function searchOrAddChannel() {
+      const input = document.getElementById('thSearchInput');
+      const query = (input.value || '').trim();
+      const platform = document.getElementById('thPlatformSelect').value;
+      if (!query) {
+        showToast('Please enter a channel name or URL', 'info');
+        return;
+      }
+
+      showToast(`Discovering channel "${query}"...`, 'info');
+      try {
+        const res = await fetch('/api/trend-hunter/channels', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ query: query, platform: platform === 'all' ? null : platform })
+        });
+        if (!res.ok) throw new Error(await res.text());
+        const data = await res.json();
+        input.value = '';
+        showToast(`Channel "${data.channel.channel_name}" tracked!`, 'success');
+        loadTrendHunterData();
+      } catch (err) {
+        showToast('Discovery failed: ' + err.message, 'error');
+      }
+    }
+
+    async function quickAddChannel(query, platform) {
+      document.getElementById('thSearchInput').value = query;
+      document.getElementById('thPlatformSelect').value = platform;
+      await searchOrAddChannel();
+    }
+
+    async function deleteTrackedChannel(channelId) {
+      try {
+        const res = await fetch(`/api/trend-hunter/channels/${encodeURIComponent(channelId)}`, { method: 'DELETE' });
+        if (res.ok) {
+          showToast('Channel removed', 'info');
+          loadTrendHunterData();
+        }
+      } catch (e) {}
+    }
+
+    async function startChannelMonitoring(channelId) {
+      const sens = document.getElementById('thSensitivitySelect').value;
+      showToast('Starting live stream buffer and spike detection...', 'info');
+      try {
+        const res = await fetch('/api/trend-hunter/monitor/start', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ channel_id: channelId, sensitivity: sens })
+        });
+        if (!res.ok) throw new Error(await res.text());
+        showToast('Live stream monitor active! Buffer is rolling.', 'success');
+        startTrendHunterPolling();
+      } catch (err) {
+        showToast('Failed to start monitoring: ' + err.message, 'error');
+      }
+    }
+
+    async function stopChannelMonitoring(channelId) {
+      try {
+        const res = await fetch('/api/trend-hunter/monitor/stop', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ channel_id: channelId })
+        });
+        if (res.ok) {
+          showToast('Live monitoring stopped.', 'info');
+          pollTrendHunterStatus();
+        }
+      } catch (e) {}
+    }
+
+    async function stopActiveMonitoring() {
+      try {
+        const res = await fetch('/api/trend-hunter/status');
+        const data = await res.json();
+        if (data.active_sessions && data.active_sessions.length > 0) {
+          await stopChannelMonitoring(data.active_sessions[0].channel_id);
+        }
+      } catch (e) {}
+    }
+
+    async function runTrendHunterSimulation() {
+      showToast('Launching simulated live stream with hype burst...', 'info');
+      try {
+        const res = await fetch('/api/trend-hunter/simulate', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ channel_name: 'IShowSpeed', platform: 'youtube' })
+        });
+        if (!res.ok) throw new Error(await res.text());
+        showToast('Simulated stream running! Watch the cockpit metrics spike.', 'success');
+        startTrendHunterPolling();
+      } catch (err) {
+        showToast('Simulation error: ' + err.message, 'error');
+      }
+    }
+
+    async function refreshReviewQueue() {
+      try {
+        const res = await fetch('/api/trend-hunter/review-queue');
+        if (!res.ok) return;
+        const data = await res.json();
+        cachedReviewClips = data.clips || [];
+        document.getElementById('thMetricClipsExtracted').textContent = cachedReviewClips.length;
+        const pendingCount = cachedReviewClips.filter(c => c.status === 'PENDING_REVIEW').length;
+        document.getElementById('thReviewQueueBadge').textContent = `${pendingCount} Pending`;
+        renderReviewQueue(cachedReviewClips);
+      } catch (e) {}
+    }
+
+    function filterReviewQueue(filter) {
+      currentReviewFilter = filter;
+      document.querySelectorAll('.th-filter-btn').forEach(btn => {
+        if (btn.textContent.trim().toUpperCase() === filter.replace('_', ' ')) {
+          btn.className = 'th-filter-btn px-3 py-1 rounded-lg bg-surface-high text-white font-semibold';
+        } else {
+          btn.className = 'th-filter-btn px-3 py-1 rounded-lg text-text-muted hover:text-white';
+        }
+      });
+      renderReviewQueue(cachedReviewClips);
+    }
+
+    function renderReviewQueue(clips) {
+      const cont = document.getElementById('thReviewQueueContainer');
+      if (!cont) return;
+
+      const filtered = (clips || []).filter(c => {
+        if (currentReviewFilter === 'ALL') return true;
+        return c.status === currentReviewFilter;
+      });
+
+      if (filtered.length === 0) {
+        cont.innerHTML = `
+          <div class="p-8 text-center bg-surface-low border border-dashed border-border rounded-2xl text-text-muted text-xs col-span-full">
+            No clips found for filter "${currentReviewFilter}". When live stream hype moments trigger, 9:16 Shorts with subtitles will appear here automatically.
+          </div>
+        `;
+        return;
+      }
+
+      cont.innerHTML = filtered.map(c => {
+        const conf = Math.round(c.confidence_score || 80);
+        const isPublished = c.status === 'PUBLISHED';
+        const isApproved = c.status === 'APPROVED';
+        const isPending = c.status === 'PENDING_REVIEW';
+        const videoSrc = c.shorts_clip_path ? `/outputs/viral_clips/${c.clip_id}_shorts.mp4` : '';
+
+        return `
+          <article class="bg-surface-low border border-border hover:border-amber-500/40 rounded-3xl p-5 transition-all space-y-4 flex flex-col justify-between">
+            <div class="space-y-3">
+              <!-- Top Header: Title & Badges -->
+              <div class="flex items-start justify-between gap-3">
+                <div class="space-y-1">
+                  <div class="flex items-center gap-2">
+                    <span class="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold uppercase ${c.platform === 'youtube' ? 'bg-red-500/20 text-red-400' : 'bg-purple-500/20 text-purple-400'}">
+                      ${c.platform}
+                    </span>
+                    <span class="text-xs font-mono text-text-subtle">Peak @ ${Math.round(c.peak_time || 0)}s</span>
+                  </div>
+                  <input id="inputTitle_${c.clip_id}" type="text" value="${c.title || 'Viral Short'}"
+                    class="w-full bg-surface border border-border focus:border-amber-400 px-3 py-1.5 rounded-xl font-headline font-bold text-white text-sm focus:outline-none" />
+                </div>
+
+                <!-- Virality Confidence Pill -->
+                <div class="px-3 py-1 rounded-full bg-surface-card border ${conf >= 80 ? 'border-tertiary text-tertiary' : 'border-amber-400 text-amber-400'} font-mono text-xs font-extrabold flex items-center gap-1.5 shadow-sm whitespace-nowrap">
+                  <span class="w-2 h-2 rounded-full ${conf >= 80 ? 'bg-tertiary' : 'bg-amber-400'} animate-pulse"></span>
+                  <span>${conf}% Virality</span>
+                </div>
+              </div>
+
+              <!-- Video Player Preview -->
+              ${videoSrc ? `
+                <div class="relative rounded-2xl overflow-hidden bg-black aspect-[9/16] max-h-[360px] mx-auto border border-border">
+                  <video src="${videoSrc}" controls class="w-full h-full object-contain" preload="metadata"></video>
+                </div>
+              ` : `
+                <div class="p-6 text-center bg-surface rounded-2xl border border-border text-xs text-text-subtle font-mono">
+                  Clip rendered at: ${c.shorts_clip_path || c.raw_clip_path}
+                </div>
+              `}
+
+              <!-- Subtitle & Transcript Snippet -->
+              <div class="bg-surface p-3 rounded-2xl border border-border space-y-1 text-xs">
+                <div class="text-[10px] text-text-subtle font-mono uppercase">Detected Dialogue (Faster-Whisper):</div>
+                <p class="text-text-muted italic line-clamp-2 font-serif">"${c.transcript || 'Speech detected and subtitled with kinetic karaoke electric yellow highlights.'}"</p>
+              </div>
+
+              <!-- Source Attribution Link -->
+              <div class="flex items-center gap-2 text-xs text-text-subtle font-mono">
+                <span>Source:</span>
+                <a href="${c.stream_url}" target="_blank" class="text-secondary hover:underline truncate max-w-xs">${c.stream_url}</a>
+              </div>
+            </div>
+
+            <!-- Copyright & Publishing Footer Gate -->
+            <div class="pt-3 border-t border-border/60 space-y-3">
+              ${isPublished ? `
+                <div class="p-3 bg-tertiary/10 border border-tertiary/30 rounded-2xl flex items-center justify-between text-xs">
+                  <div class="flex items-center gap-2 text-tertiary font-bold">
+                    <span class="material-symbols-outlined text-[18px]">verified</span>
+                    <span>PUBLISHED TO YOUTUBE SHORTS</span>
+                  </div>
+                  ${c.youtube_video_id ? `
+                    <a href="https://www.youtube.com/shorts/${c.youtube_video_id}" target="_blank" class="text-secondary font-mono hover:underline">View Short</a>
+                  ` : ''}
+                </div>
+              ` : `
+                <!-- Copyright & Rights Gate Checkbox -->
+                <label class="flex items-start gap-2.5 text-xs text-text-muted cursor-pointer select-none">
+                  <input id="cbCopyright_${c.clip_id}" type="checkbox" class="mt-0.5 rounded border-border text-secondary focus:ring-0" />
+                  <span>I confirm I hold broadcasting rights, permission, or fair-use commentary license to publish this highlight.</span>
+                </label>
+
+                <!-- Actions -->
+                <div class="flex items-center gap-2">
+                  <button onclick="approveAndPublishShort('${c.clip_id}')"
+                    class="flex-1 py-2.5 px-4 rounded-xl bg-gradient-to-r from-tertiary to-emerald-600 hover:brightness-110 text-black font-headline text-xs font-bold shadow-md transition-all flex items-center justify-center gap-1.5">
+                    <span class="material-symbols-outlined text-[17px]">publish</span>
+                    <span>1-Click Approve & Publish to Shorts</span>
+                  </button>
+
+                  <button onclick="rejectShort('${c.clip_id}')" title="Reject / Dismiss"
+                    class="p-2.5 rounded-xl bg-surface hover:bg-surface-high text-text-subtle hover:text-red-400 border border-border transition-colors">
+                    <span class="material-symbols-outlined text-[17px]">close</span>
+                  </button>
+
+                  <a href="${videoSrc}" download class="p-2.5 rounded-xl bg-surface hover:bg-surface-high text-text-subtle hover:text-white border border-border transition-colors" title="Download Short MP4">
+                    <span class="material-symbols-outlined text-[17px]">download</span>
+                  </a>
+                </div>
+              `}
+            </div>
+          </article>
+        `;
+      }).join('');
+    }
+
+    async function approveAndPublishShort(clipId) {
+      const cb = document.getElementById(`cbCopyright_${clipId}`);
+      if (!cb || !cb.checked) {
+        showToast('Please check the copyright permission confirmation checkbox first.', 'info');
+        return;
+      }
+
+      const inputTitle = document.getElementById(`inputTitle_${clipId}`);
+      const customTitle = inputTitle ? inputTitle.value : null;
+
+      showToast('Publishing viral Short to YouTube...', 'info');
+      try {
+        const res = await fetch(`/api/trend-hunter/clips/${encodeURIComponent(clipId)}/approve-and-publish`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ copyright_confirmed: true, title: customTitle })
+        });
+        if (!res.ok) throw new Error(await res.text());
+        const data = await res.json();
+        showToast(data.message || 'Viral Short published to YouTube Shorts!', 'success');
+        refreshReviewQueue();
+      } catch (err) {
+        showToast('Publishing failed: ' + err.message, 'error');
+      }
+    }
+
+    async function rejectShort(clipId) {
+      try {
+        const res = await fetch(`/api/trend-hunter/clips/${encodeURIComponent(clipId)}/reject`, { method: 'POST' });
+        if (res.ok) {
+          showToast('Clip dismissed.', 'info');
+          refreshReviewQueue();
+        }
+      } catch (e) {}
+    }
+
     // Polling interval
     setInterval(() => {
       if (currentBatchId) selectBatch(currentBatchId);
@@ -1806,6 +2450,7 @@
     checkYoutubeStatus();
     loadBatches();
     pollChatEngineStatus();
+    loadTrendHunterData();
 
   </script>
 </body>
