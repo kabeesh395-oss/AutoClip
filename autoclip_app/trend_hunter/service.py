@@ -54,7 +54,7 @@ class TrendHunterService:
 
         spike_data = payload.get("spike", {})
         pred_data = payload.get("prediction", {})
-        from .detector import SpikeEvent
+        from ..chat_engine.models import SpikeEvent
         from .models import PredictionResult
 
         spike = SpikeEvent(
