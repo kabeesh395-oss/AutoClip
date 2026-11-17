@@ -1371,10 +1371,42 @@ def api_trend_hunter_publish(clip_id: str, payload: dict = Body(default={})):
         raise HTTPException(500, f"Publishing failed: {exc}")
 
 
-@app.post("/api/trend-hunter/clips/{clip_id}/reject")
-def api_trend_hunter_reject(clip_id: str):
+@app.post("/api/trend-hunter/channels/{channel_id}/priority")
+def api_trend_hunter_channel_priority(channel_id: str, payload: dict = Body(...)):
     from .trend_hunter import trend_hunter_service
-    success = trend_hunter_service.reject_clip(clip_id)
+    priority = int(payload.get("priority", 1))
+    success = trend_hunter_service.set_channel_priority(channel_id, priority)
+    return {"status": "updated" if success else "failed", "channel_id": channel_id, "priority": priority}
+
+
+@app.post("/api/trend-hunter/settings/automation-level")
+def api_trend_hunter_set_automation_level(payload: dict = Body(...)):
+    from .trend_hunter import trend_hunter_service
+    mode = str(payload.get("automation_level") or payload.get("mode") or "MANUAL").upper()
+    if mode not in ("MANUAL", "SEMI_AUTO", "FULL_AUTO"):
+        raise HTTPException(400, "Invalid automation_level. Choose MANUAL, SEMI_AUTO, or FULL_AUTO.")
+    saved_mode = trend_hunter_service.set_automation_level(mode)
+    return {"status": "updated", "automation_level": saved_mode}
+
+
+@app.post("/api/trend-hunter/analytics/sync")
+def api_trend_hunter_sync_analytics():
+    from .trend_hunter import trend_hunter_service
+    count = trend_hunter_service.sync_performance_analytics()
+    return {"status": "synced", "updated_clips_count": count}
+
+
+@app.get("/api/trend-hunter/learning/weights")
+def api_trend_hunter_get_learning_weights():
+    from .trend_hunter import trend_hunter_service
+    return {"weights": trend_hunter_service.feedback_learner.current_weights.to_dict()}
+
+
+@app.post("/api/trend-hunter/clips/{clip_id}/reject")
+def api_trend_hunter_reject(clip_id: str, payload: dict = Body(default={})):
+    from .trend_hunter import trend_hunter_service
+    reason = payload.get("reason", "")
+    success = trend_hunter_service.reject_clip(clip_id, reason=reason)
     return {"status": "rejected" if success else "failed", "clip_id": clip_id}
 
 

@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import Any
 
 from ..pipeline import Candidate, Segment, generate_opus_ass, generate_viral_intelligence, transcribe
+from .advanced_editing import AdvancedClipEditor
 from .models import TrendHunterConfig, ViralClipRecord
 
 logger = logging.getLogger("autoclip.trend_hunter.clip_pipeline")
@@ -20,18 +21,19 @@ OUTPUTS_DIR = ROOT / "data" / "outputs" / "viral_clips"
 
 class ViralClipPipeline:
     """
-    Automatic production pipeline for detected viral live stream moments.
-    Produces:
-      - 9:16 vertical YouTube Shorts format (with signature FIT_BLUR layout)
-      - Word-level timestamps via Faster-Whisper
-      - Kinetic Opus-style electric yellow karaoke ASS subtitles
+    Production-grade AI Clip Pipeline for Phase 2:
+      - Dead-air & silence trimming
+      - Faster-Whisper word-level transcription
+      - Kinetic electric yellow karaoke ASS subtitles
+      - Dynamic reframing (FIT_BLUR, SPLIT_STACK, SMART_CROP)
+      - Quality Assurance & Validation check
       - AI Hook, 5 viral titles, description, and hashtags
-      - High-resolution thumbnail captured at peak hype timestamp
     """
 
     def __init__(self, output_dir: Path | None = None) -> None:
         self.output_dir = output_dir or OUTPUTS_DIR
         self.output_dir.mkdir(parents=True, exist_ok=True)
+        self.editor = AdvancedClipEditor(output_dir=self.output_dir)
 
     def process_viral_moment(
         self,
@@ -45,36 +47,53 @@ class ViralClipPipeline:
         clip_end: float,
         confidence_score: float,
         demand_score: float,
+        why_selected: str = "",
         config: TrendHunterConfig | None = None,
     ) -> ViralClipRecord:
         """
-        Processes a raw extracted video segment into a publication-ready YouTube Short.
+        Executes end-to-end editing, formatting, and quality check on raw video slice.
         """
         cfg = config or TrendHunterConfig()
         clip_uid = f"viral_{uuid.uuid4().hex[:8]}"
         duration = max(1.0, clip_end - clip_start)
 
+        # File paths
+        trimmed_raw = self.output_dir / f"{clip_uid}_trimmed.mp4"
         shorts_target = self.output_dir / f"{clip_uid}_shorts.mp4"
         thumb_target = self.output_dir / f"{clip_uid}_thumb.jpg"
         ass_target = self.output_dir / f"{clip_uid}.ass"
 
-        # 1. Transcribe audio with Faster-Whisper
+        # 1. Dead-Air & Silence Removal (if enabled)
+        effective_source = raw_clip_path
+        if cfg.remove_silence:
+            try:
+                effective_source = self.editor.remove_silence(
+                    input_path=raw_clip_path,
+                    output_path=trimmed_raw,
+                    threshold_db=cfg.silence_threshold_db,
+                    min_silence_sec=cfg.silence_duration_sec,
+                )
+            except Exception as exc:
+                logger.debug("Silence trimming step skipped: %s", exc)
+                effective_source = raw_clip_path
+
+        # 2. Faster-Whisper Speech Transcription
         segments: list[Segment] = []
         transcript_text = ""
         try:
             whisper_model = os.getenv("WHISPER_MODEL", "small")
-            segments = transcribe(raw_clip_path, model_name=whisper_model)
+            segments = transcribe(effective_source, model_name=whisper_model)
             transcript_text = " ".join(s.text for s in segments).strip()
         except Exception as exc:
-            logger.warning("Whisper transcription failed or no speech detected (%s); continuing with visual clip", exc)
+            logger.warning("Whisper transcription failed or no speech detected (%s)", exc)
             transcript_text = f"High-energy moment from {channel_name}'s live stream!"
 
-        # 2. Generate Viral Metadata & Titles
+        # 3. Viral Titles, Hooks, and Descriptions
         cand = Candidate(
             start=0.0,
             end=duration,
             title=f"{channel_name} Viral Moment",
-            reason=f"Spike detected with {confidence_score:.0f}% confidence",
+            reason=why_selected or f"Moment detected with {confidence_score:.0f}% confidence",
             score=confidence_score,
             transcript=transcript_text,
         )
@@ -88,9 +107,9 @@ class ViralClipPipeline:
         desc = intel.get("description") or f"Best highlight from {channel_name}'s stream.\n\n#Shorts #{channel_name.replace(' ', '')}"
         tags = intel.get("tags") or ["shorts", channel_name.lower().replace(" ", ""), "viral", "streamer"]
 
-        # 3. Generate Kinetic ASS Subtitles if speech exists
-        use_ass = False
-        ass_esc = ""
+        # 4. Kinetic ASS Subtitles with Visual Hook Banner
+        hook_banner_text = intel.get("hook", {}).get("text") or title
+        ass_path = None
         if segments:
             try:
                 generate_opus_ass(
@@ -99,73 +118,40 @@ class ViralClipPipeline:
                     clip_end=duration,
                     target_ass=ass_target,
                     caption_style=cfg.caption_style,
-                    hook_title=intel.get("hook", {}).get("text") or title,
+                    hook_title=hook_banner_text,
                 )
-                ass_esc = str(ass_target.resolve()).replace("\\", "/").replace(":", r"\:").replace("'", r"\'")
-                use_ass = True
+                ass_path = ass_target
             except Exception as exc:
                 logger.warning("Failed to generate kinetic ASS subtitles: %s", exc)
 
-        # 4. Render 9:16 Shorts with FIT_BLUR layout
-        if cfg.layout == "9:16":
-            sub_filter = f",ass='{ass_esc}'" if use_ass else ""
-            vf = (
-                f"[0:v]scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,"
-                f"boxblur=25:5,eq=brightness=-0.12[bg];"
-                f"[0:v]scale=1080:-1[fg];"
-                f"[bg][fg]overlay=(W-w)/2:(H-h)/2{sub_filter},format=yuv420p[v]"
-            )
-            cmd = [
-                "ffmpeg", "-hide_banner", "-y",
-                "-i", str(raw_clip_path),
-                "-filter_complex", vf,
-                "-map", "[v]", "-map", "0:a?",
-                "-c:v", "libx264", "-preset", "veryfast", "-crf", "22",
-                "-c:a", "aac", "-b:a", "192k",
-                "-af", "loudnorm=I=-16:TP=-1.5:LRA=11",
-                "-movflags", "+faststart",
-                str(shorts_target),
-            ]
-        else:
-            # 16:9 widescreen layout
-            sub_filter = f"ass='{ass_esc}'," if use_ass else ""
-            cmd = [
-                "ffmpeg", "-hide_banner", "-y",
-                "-i", str(raw_clip_path),
-                "-vf", f"{sub_filter}format=yuv420p",
-                "-c:v", "libx264", "-preset", "veryfast", "-crf", "22",
-                "-c:a", "aac", "-b:a", "192k",
-                "-af", "loudnorm=I=-16:TP=-1.5:LRA=11",
-                "-movflags", "+faststart",
-                str(shorts_target),
-            ]
+        # 5. Intelligent Reframing (FIT_BLUR, SPLIT_STACK, SMART_CROP)
+        self.editor.reframe_to_vertical(
+            input_path=effective_source,
+            output_path=shorts_target,
+            layout=cfg.layout,
+            ass_path=ass_path,
+        )
 
-        logger.info("Rendering viral Short %s: %s", clip_uid, " ".join(cmd[:10]))
-        res = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
-        if res.returncode != 0 or not shorts_target.exists() or shorts_target.stat().st_size == 0:
-            logger.warning("Complex Shorts render failed, falling back to direct scale: %s", res.stderr[-300:])
-            # Fallback direct 9:16 crop
-            fallback_cmd = [
-                "ffmpeg", "-hide_banner", "-y",
-                "-i", str(raw_clip_path),
-                "-vf", "scale=1080:1920:force_original_aspect_ratio=decrease,pad=1080:1920:(ow-iw)/2:(oh-ih)/2:black,format=yuv420p",
-                "-c:v", "libx264", "-preset", "veryfast", "-crf", "22",
-                "-c:a", "aac", "-b:a", "160k",
-                str(shorts_target),
-            ]
-            subprocess.run(fallback_cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-
-        # 5. Extract Thumbnail at peak moment
+        # 6. Extract Thumbnail at peak moment
         peak_offset = max(0.0, min(duration - 0.5, peak_time - clip_start))
         thumb_cmd = [
             "ffmpeg", "-hide_banner", "-y",
             "-ss", str(round(peak_offset, 2)),
-            "-i", str(shorts_target if shorts_target.exists() else raw_clip_path),
+            "-i", str(shorts_target if shorts_target.exists() else effective_source),
             "-vframes", "1",
             "-q:v", "2",
             str(thumb_target),
         ]
         subprocess.run(thumb_cmd, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
+
+        # 7. Automated Quality Assurance Check
+        final_video = shorts_target if shorts_target.exists() else effective_source
+        qc_passed, qc_issues = self.editor.run_quality_check(final_video, transcript_text)
+
+        # Determine initial status based on automation level
+        initial_status = "PENDING_REVIEW"
+        if cfg.automation_level == "SEMI_AUTO" and qc_passed and confidence_score >= 80.0:
+            initial_status = "PRE_APPROVED"
 
         return ViralClipRecord(
             clip_id=clip_uid,
@@ -180,13 +166,16 @@ class ViralClipPipeline:
             confidence_score=round(confidence_score, 1),
             demand_score=round(demand_score, 1),
             raw_clip_path=str(raw_clip_path),
-            shorts_clip_path=str(shorts_target if shorts_target.exists() else raw_clip_path),
+            shorts_clip_path=str(final_video),
             thumbnail_path=str(thumb_target if thumb_target.exists() else ""),
             title=title,
             titles=titles,
             description=desc,
             tags=tags,
             transcript=transcript_text,
-            status="PENDING_REVIEW",
+            why_selected=why_selected,
+            status=initial_status,
+            quality_check_passed=qc_passed,
+            quality_issues=qc_issues,
             copyright_confirmed=False,
         )

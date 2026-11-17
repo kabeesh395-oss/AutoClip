@@ -14,8 +14,10 @@ from ..chat_engine.sources import BaseChatSource, SimulatedStreamChatSource, Twi
 from .audio_monitor import AudioLoudnessMonitor
 from .clip_pipeline import ViralClipPipeline
 from .demand import DemandEngine
+from .learning import FeedbackLearner
 from .live_buffer import RollingLiveBuffer
-from .models import ChannelProfile, LiveSessionState, TrendHunterConfig, ViralClipRecord
+from .models import ChannelProfile, LiveSessionState, PredictionResult, TrendHunterConfig, ViralClipRecord
+from .predictor import ViralMomentPredictor
 from .storage import TrendStorage
 
 logger = logging.getLogger("autoclip.trend_hunter.monitor")
@@ -26,15 +28,13 @@ OUTPUTS_DIR = ROOT / "data" / "outputs" / "viral_clips"
 
 class LiveStreamMonitorSession:
     """
-    Autonomous live stream monitor for a single channel.
-    Synchronizes:
-      - Rolling 5-minute video ring buffer (FFmpeg/Streamlink)
-      - Real-time chat message ingestion (Twitch IRC / YouTube Live Chat)
-      - Statistical spike detection & Shannon entropy spam filtering
-      - Audio loudness & shouting surge analysis
-      - Multi-signal viral moment fusion (Chat + Audio + Viewers + Transcript)
-      - Pre-roll (20s) and Post-roll (40s) preservation
-      - Autonomous 9:16 Shorts rendering with Whisper & kinetic ASS subtitles
+    Autonomous live stream monitor with Phase 2 Intelligent Viral Prediction:
+      - Rolling 5-minute video buffer (preserves 20s pre-roll & 40s post-roll)
+      - Velocity Acceleration forecasting (predicts climax before peak plateau)
+      - Stream disconnection recovery with exponential backoff
+      - Multi-modal signal fusion (Chat + Chatter Growth + Audio + Dialogue)
+      - Explainable 'Why Selected' rationale generation
+      - Automated Silence Trimming & 9:16 Shorts reframing
     """
 
     def __init__(
@@ -44,12 +44,14 @@ class LiveStreamMonitorSession:
         config: TrendHunterConfig | None = None,
         source_video_fallback: Path | None = None,
         is_simulation: bool = False,
+        feedback_learner: FeedbackLearner | None = None,
     ) -> None:
         self.channel = channel
         self.storage = storage
         self.config = config or TrendHunterConfig()
         self.source_video_fallback = source_video_fallback
         self.is_simulation = is_simulation
+        self.feedback_learner = feedback_learner or FeedbackLearner(storage.db_path)
 
         self.session_id = f"sess_{uuid.uuid4().hex[:8]}"
         self.state = LiveSessionState(
@@ -71,8 +73,9 @@ class LiveStreamMonitorSession:
         self.audio_monitor = AudioLoudnessMonitor()
         self.demand_engine = DemandEngine()
         self.clip_pipeline = ViralClipPipeline(output_dir=OUTPUTS_DIR)
+        self.predictor = ViralMomentPredictor(adaptive_weights=self.feedback_learner.current_weights)
 
-        # Chat detector configuration aligned with sensitivity
+        # Chat detector
         spike_cfg = SpikeDetectorConfig(
             sensitivity=self.config.sensitivity,
             pre_roll_seconds=self.config.pre_roll_seconds,
@@ -104,7 +107,19 @@ class LiveStreamMonitorSession:
             simulated_source=self.source_video_fallback,
         )
 
-        # 2. Start chat ingestion source
+        # 2. Start chat ingestion with resilience
+        self._init_chat_source()
+
+        # 3. Spawn background workers
+        self._monitor_tasks.append(asyncio.create_task(self._resilient_chat_loop()))
+        self._monitor_tasks.append(asyncio.create_task(self._audio_analytics_loop()))
+        self._monitor_tasks.append(asyncio.create_task(self._heartbeat_loop()))
+
+        logger.info("LiveStreamMonitorSession started for %s (%s)", self.channel.channel_name, self.session_id)
+        return self.state
+
+    def _init_chat_source(self) -> None:
+        stream_url = self.channel.stream_url or self.channel.channel_url
         if self.is_simulation:
             self._chat_source = SimulatedStreamChatSource(
                 duration_seconds=300.0,
@@ -115,14 +130,6 @@ class LiveStreamMonitorSession:
             self._chat_source = TwitchIRCChatSource(channel=channel_login)
         else:
             self._chat_source = YouTubeLiveChatSource(video_id_or_url=stream_url)
-
-        # 3. Spawn background workers
-        self._monitor_tasks.append(asyncio.create_task(self._chat_loop()))
-        self._monitor_tasks.append(asyncio.create_task(self._audio_analytics_loop()))
-        self._monitor_tasks.append(asyncio.create_task(self._heartbeat_loop()))
-
-        logger.info("LiveStreamMonitorSession started for %s (%s)", self.channel.channel_name, self.session_id)
-        return self.state
 
     async def stop(self) -> LiveSessionState:
         """Gracefully halts all capture, chat sources, and processing."""
@@ -143,32 +150,51 @@ class LiveStreamMonitorSession:
         logger.info("LiveStreamMonitorSession stopped for %s", self.session_id)
         return self.state
 
-    async def _chat_loop(self) -> None:
-        """Consumes live chat messages, feeds spike detector, and handles triggers."""
-        try:
-            if not self._chat_source:
-                return
-            await self._chat_source.connect()
-            async for msg in self._chat_source.iter_messages():
+    async def _resilient_chat_loop(self) -> None:
+        """
+        Chat loop with automated reconnection and exponential backoff.
+        Recovers safely if live chat drops or stream disconnects.
+        """
+        backoff_sec = 1.0
+        while self._is_running:
+            try:
+                if not self._chat_source:
+                    self._init_chat_source()
+                await self._chat_source.connect()
+                backoff_sec = 1.0  # Reset backoff on successful connect
+
+                async for msg in self._chat_source.iter_messages():
+                    if not self._is_running:
+                        break
+
+                    # Record metric for acceleration tracking
+                    metrics = self.spike_detector.get_current_metrics(5.0)
+                    self.predictor.record_chat_metric(msg.timestamp, metrics.messages_per_second, msg.author)
+
+                    # Feed detector
+                    spike_event = self.spike_detector.feed_message(msg)
+                    if spike_event:
+                        asyncio.create_task(self._on_spike_detected(spike_event))
+
+            except asyncio.CancelledError:
+                break
+            except Exception as exc:
                 if not self._is_running:
                     break
-
-                spike_event = self.spike_detector.feed_message(msg)
-                if spike_event:
-                    asyncio.create_task(self._on_spike_detected(spike_event))
-
-        except asyncio.CancelledError:
-            pass
-        except Exception as exc:
-            logger.warning("Error in live chat loop (%s): %s", self.session_id, exc)
-            self.state.error_message = str(exc)
+                self.state.reconnect_count += 1
+                logger.warning(
+                    "Stream chat disconnected (%s: %s). Reconnecting in %.1fs (attempt %d)...",
+                    self.channel.channel_name, exc, backoff_sec, self.state.reconnect_count
+                )
+                await asyncio.sleep(backoff_sec)
+                backoff_sec = min(30.0, backoff_sec * 2.0)  # Exponential backoff capped at 30s
+                self._init_chat_source()
 
     async def _audio_analytics_loop(self) -> None:
         """Periodically checks latest audio buffer chunks for energy/loudness surges."""
         while self._is_running:
-            await asyncio.sleep(6.0)
+            await asyncio.sleep(5.0)
             try:
-                # Find latest completed chunk
                 if self.live_buffer._chunks:
                     latest_chunk = self.live_buffer._chunks[-1]
                     mean_db, max_db, score = self.audio_monitor.analyze_audio_segment(latest_chunk.file_path)
@@ -185,7 +211,6 @@ class LiveStreamMonitorSession:
                 self.state.current_mps = round(metrics_10s.messages_per_second, 2)
                 self.state.buffer_duration_seconds = round(self.live_buffer.current_buffer_duration, 1)
 
-                # Clean recent spikes older than 10 minutes
                 now_t = time.time()
                 self._recent_spikes = [t for t in self._recent_spikes if now_t - t < 600.0]
 
@@ -206,48 +231,52 @@ class LiveStreamMonitorSession:
 
     async def _on_spike_detected(self, spike: SpikeEvent) -> None:
         """
-        Handles confirmed hype burst from the spike detector.
-        Fuses multi-modal signals and schedules automatic clip extraction.
+        Handles hype burst: runs Phase 2 viral moment prediction with acceleration
+        and multi-modal signal fusion before scheduling extraction.
         """
         now_t = time.time()
         self._recent_spikes.append(now_t)
         self.state.spikes_detected_count += 1
 
-        # 1. Anti-Duplicate Filtering: enforce minimum distance between extracted clips
+        # 1. Anti-Duplicate Filtering
         if abs(spike.peak_time - self._last_clip_peak_time) < self.config.dedup_window_seconds:
             logger.info("Skipping overlapping spike at %.1fs (within %ds dedup window)",
                         spike.peak_time, self.config.dedup_window_seconds)
             return
 
-        # 2. Combined Confidence Scoring
-        chat_score = spike.highlight_score  # 0-100 from Shannon entropy & z-score
-        audio_score = getattr(self.audio_monitor, "latest_excitement", 40.0)
-        viewer_factor = min(100.0, max(20.0, self.state.current_demand_score))
+        # 2. Multi-Signal Prediction & 'Why Selected' Rationale Generation
+        baseline_db = sum(self.audio_monitor._mean_volume_history) / max(1, len(self.audio_monitor._mean_volume_history)) if self.audio_monitor._mean_volume_history else -30.0
+        audio_surge = self.audio_monitor.latest_mean_db - baseline_db
 
-        # Weighted combination: 50% Chat + 25% Audio + 25% Demand/Viewers
-        combined_confidence = round(
-            (0.50 * chat_score) + (0.25 * audio_score) + (0.25 * viewer_factor), 1
+        prediction = self.predictor.predict_viral_moment(
+            current_mps=spike.peak_mps,
+            baseline_mps=spike.baseline_mps,
+            audio_surge_db=audio_surge,
+            audio_max_db=self.audio_monitor.latest_max_db,
+            viewer_growth_rate=self.channel.viewer_growth_rate,
+            recent_transcript=" ".join(spike.dominant_keywords),
         )
 
         logger.info(
-            "Viral moment candidate at %.1fs: ChatScore=%.1f, Audio=%.1f, Combined=%.1f (threshold=%.1f)",
-            spike.peak_time, chat_score, audio_score, combined_confidence, self.config.min_confidence
+            "Viral Prediction at %.1fs: Confidence=%.1f%% (early=%s, acc=%.2f) - %s",
+            spike.peak_time, prediction.confidence_score, prediction.is_early_prediction,
+            prediction.acceleration, prediction.rationale
         )
 
-        if combined_confidence < self.config.min_confidence:
-            logger.info("Spike confidence %.1f below threshold %.1f; skipping extraction",
-                        combined_confidence, self.config.min_confidence)
+        if prediction.confidence_score < self.config.min_confidence:
+            logger.info("Prediction confidence %.1f below threshold %.1f; skipping",
+                        prediction.confidence_score, self.config.min_confidence)
             return
 
         self._last_clip_peak_time = spike.peak_time
 
-        # 3. Asynchronously extract clip once post-roll footage has arrived
-        asyncio.create_task(self._extract_viral_clip(spike, combined_confidence))
+        # 3. Schedule clip extraction and processing
+        asyncio.create_task(self._extract_viral_clip(spike, prediction))
 
-    async def _extract_viral_clip(self, spike: SpikeEvent, confidence: float) -> None:
+    async def _extract_viral_clip(self, spike: SpikeEvent, prediction: PredictionResult) -> None:
         """
-        Waits for post-roll buffer, extracts raw video slice, renders 9:16 Short,
-        and saves into review queue.
+        Waits for post-roll buffer, extracts raw slice, executes advanced editing
+        (silence trimming, 9:16 reframing, quality check), and saves to review queue.
         """
         clip_start = max(0.0, spike.clip_start)
         clip_end = spike.clip_end
@@ -255,8 +284,7 @@ class LiveStreamMonitorSession:
         logger.info("Queuing viral clip extraction [%.1fs -> %.1fs] (peak: %.1fs)",
                     clip_start, clip_end, spike.peak_time)
 
-        # Wait for post-roll video to be captured in the rolling buffer
-        # In simulation with local fallback, we don't need to block if video already exists
+        # Wait for post-roll video to be captured in the buffer
         if not self.source_video_fallback or not self.source_video_fallback.exists():
             post_roll_ready = await self.live_buffer.wait_for_post_roll(
                 target_timestamp=clip_end,
@@ -268,7 +296,7 @@ class LiveStreamMonitorSession:
         raw_clip_path = OUTPUTS_DIR / f"{self.session_id}_{int(spike.peak_time)}_raw.mp4"
 
         try:
-            # Extract raw video slice
+            # 1. Extract raw slice from rolling buffer
             self.live_buffer.extract_segment(
                 start_seconds=clip_start,
                 end_seconds=clip_end,
@@ -276,7 +304,7 @@ class LiveStreamMonitorSession:
                 full_source_fallback=self.source_video_fallback,
             )
 
-            # Process into 9:16 YouTube Short with subtitles and viral intelligence
+            # 2. Execute Phase 2 Advanced Editing (silence removal, 9:16 layout, subtitles, QC)
             clip_record = self.clip_pipeline.process_viral_moment(
                 raw_clip_path=raw_clip_path,
                 session_id=self.session_id,
@@ -286,16 +314,19 @@ class LiveStreamMonitorSession:
                 peak_time=spike.peak_time,
                 clip_start=clip_start,
                 clip_end=clip_end,
-                confidence_score=confidence,
+                confidence_score=prediction.confidence_score,
                 demand_score=self.state.current_demand_score,
+                why_selected=prediction.rationale,
                 config=self.config,
             )
 
-            # Store in database review queue
+            # 3. Store in database
             self.storage.add_clip(clip_record)
             self.state.clips_extracted_count += 1
             self.storage.update_session(self.state)
-            logger.info("Successfully produced viral Short '%s' (%s)", clip_record.title, clip_record.clip_id)
+
+            logger.info("Produced viral Short '%s' (%s) [QC passed: %s]",
+                        clip_record.title, clip_record.clip_id, clip_record.quality_check_passed)
 
         except Exception as exc:
             logger.error("Failed to extract and process viral clip: %s", exc, exc_info=True)

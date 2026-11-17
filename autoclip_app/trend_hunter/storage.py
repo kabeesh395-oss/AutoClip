@@ -30,6 +30,13 @@ def get_trend_db(db_path: Path = DEFAULT_DB) -> Generator[sqlite3.Connection, No
         conn.close()
 
 
+def _safe_add_column(conn: sqlite3.Connection, table: str, column_def: str) -> None:
+    try:
+        conn.execute(f"ALTER TABLE {table} ADD COLUMN {column_def};")
+    except sqlite3.OperationalError:
+        pass
+
+
 def init_trend_tables(db_path: Path = DEFAULT_DB) -> None:
     with get_trend_db(db_path) as conn:
         conn.execute("""
@@ -49,9 +56,17 @@ def init_trend_tables(db_path: Path = DEFAULT_DB) -> None:
                 stream_title TEXT,
                 thumbnail_url TEXT,
                 last_checked_at TEXT NOT NULL,
-                auto_monitor INTEGER NOT NULL DEFAULT 0
+                auto_monitor INTEGER NOT NULL DEFAULT 0,
+                custom_priority INTEGER NOT NULL DEFAULT 1,
+                is_rapid_growing INTEGER NOT NULL DEFAULT 0,
+                engagement_density REAL NOT NULL DEFAULT 0.0
             );
         """)
+
+        # Safe migration for existing tables
+        _safe_add_column(conn, "trend_channels", "custom_priority INTEGER NOT NULL DEFAULT 1")
+        _safe_add_column(conn, "trend_channels", "is_rapid_growing INTEGER NOT NULL DEFAULT 0")
+        _safe_add_column(conn, "trend_channels", "engagement_density REAL NOT NULL DEFAULT 0.0")
 
         conn.execute("""
             CREATE TABLE IF NOT EXISTS trend_sessions (
@@ -69,9 +84,11 @@ def init_trend_tables(db_path: Path = DEFAULT_DB) -> None:
                 spikes_detected_count INTEGER NOT NULL DEFAULT 0,
                 clips_extracted_count INTEGER NOT NULL DEFAULT 0,
                 buffer_dir TEXT,
-                meta_json TEXT
+                meta_json TEXT,
+                reconnect_count INTEGER NOT NULL DEFAULT 0
             );
         """)
+        _safe_add_column(conn, "trend_sessions", "reconnect_count INTEGER NOT NULL DEFAULT 0")
 
         conn.execute("""
             CREATE TABLE IF NOT EXISTS trend_clips (
@@ -97,9 +114,19 @@ def init_trend_tables(db_path: Path = DEFAULT_DB) -> None:
                 status TEXT NOT NULL DEFAULT 'PENDING_REVIEW',
                 copyright_confirmed INTEGER NOT NULL DEFAULT 0,
                 youtube_video_id TEXT,
-                created_at TEXT NOT NULL
+                created_at TEXT NOT NULL,
+                why_selected TEXT,
+                quality_check_passed INTEGER NOT NULL DEFAULT 1,
+                quality_issues_json TEXT,
+                views_count INTEGER NOT NULL DEFAULT 0,
+                likes_count INTEGER NOT NULL DEFAULT 0
             );
         """)
+        _safe_add_column(conn, "trend_clips", "why_selected TEXT")
+        _safe_add_column(conn, "trend_clips", "quality_check_passed INTEGER NOT NULL DEFAULT 1")
+        _safe_add_column(conn, "trend_clips", "quality_issues_json TEXT")
+        _safe_add_column(conn, "trend_clips", "views_count INTEGER NOT NULL DEFAULT 0")
+        _safe_add_column(conn, "trend_clips", "likes_count INTEGER NOT NULL DEFAULT 0")
 
 
 class TrendStorage:
@@ -113,8 +140,9 @@ class TrendStorage:
                 INSERT INTO trend_channels (
                     id, channel_name, platform, channel_url, handle, stream_url,
                     is_live, current_viewers, viewer_history_json, viewer_growth_rate,
-                    demand_score, category, stream_title, thumbnail_url, last_checked_at, auto_monitor
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    demand_score, category, stream_title, thumbnail_url, last_checked_at, auto_monitor,
+                    custom_priority, is_rapid_growing, engagement_density
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ON CONFLICT(id) DO UPDATE SET
                     channel_name = excluded.channel_name,
                     platform = excluded.platform,
@@ -130,14 +158,18 @@ class TrendStorage:
                     stream_title = excluded.stream_title,
                     thumbnail_url = excluded.thumbnail_url,
                     last_checked_at = excluded.last_checked_at,
-                    auto_monitor = excluded.auto_monitor;
+                    auto_monitor = excluded.auto_monitor,
+                    custom_priority = excluded.custom_priority,
+                    is_rapid_growing = excluded.is_rapid_growing,
+                    engagement_density = excluded.engagement_density;
             """, (
                 channel.id, channel.channel_name, channel.platform, channel.channel_url,
                 channel.handle, channel.stream_url, 1 if channel.is_live else 0,
                 channel.current_viewers, json.dumps(channel.viewer_history),
                 channel.viewer_growth_rate, channel.demand_score, channel.category,
                 channel.stream_title, channel.thumbnail_url, channel.last_checked_at,
-                1 if channel.auto_monitor else 0,
+                1 if channel.auto_monitor else 0, channel.custom_priority,
+                1 if channel.is_rapid_growing else 0, channel.engagement_density,
             ))
 
     def get_channel(self, channel_id: str) -> ChannelProfile | None:
@@ -150,9 +182,14 @@ class TrendStorage:
     def list_channels(self) -> list[ChannelProfile]:
         with get_trend_db(self.db_path) as conn:
             rows = conn.execute(
-                "SELECT * FROM trend_channels ORDER BY is_live DESC, demand_score DESC, current_viewers DESC"
+                "SELECT * FROM trend_channels ORDER BY is_live DESC, custom_priority DESC, demand_score DESC, current_viewers DESC"
             ).fetchall()
             return [self._row_to_channel(r) for r in rows]
+
+    def set_channel_priority(self, channel_id: str, priority: int) -> bool:
+        with get_trend_db(self.db_path) as conn:
+            res = conn.execute("UPDATE trend_channels SET custom_priority = ? WHERE id = ?", (priority, channel_id))
+            return res.rowcount > 0
 
     def delete_channel(self, channel_id: str) -> bool:
         with get_trend_db(self.db_path) as conn:
@@ -165,13 +202,13 @@ class TrendStorage:
                 INSERT INTO trend_sessions (
                     session_id, channel_id, channel_name, platform, stream_url,
                     status, started_at, current_viewers, current_mps, current_demand_score,
-                    spikes_detected_count, clips_extracted_count, buffer_dir
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    spikes_detected_count, clips_extracted_count, buffer_dir, reconnect_count
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """, (
                 session.session_id, session.channel_id, session.channel_name, session.platform,
                 session.stream_url, session.status, session.started_at, session.current_viewers,
                 session.current_mps, session.current_demand_score, session.spikes_detected_count,
-                session.clips_extracted_count, buffer_dir,
+                session.clips_extracted_count, buffer_dir, session.reconnect_count,
             ))
 
     def update_session(self, session: LiveSessionState) -> None:
@@ -179,12 +216,13 @@ class TrendStorage:
             conn.execute("""
                 UPDATE trend_sessions SET
                     status = ?, stopped_at = ?, current_viewers = ?, current_mps = ?,
-                    current_demand_score = ?, spikes_detected_count = ?, clips_extracted_count = ?
+                    current_demand_score = ?, spikes_detected_count = ?, clips_extracted_count = ?,
+                    reconnect_count = ?
                 WHERE session_id = ?
             """, (
                 session.status, session.stopped_at, session.current_viewers, session.current_mps,
                 session.current_demand_score, session.spikes_detected_count, session.clips_extracted_count,
-                session.session_id,
+                session.reconnect_count, session.session_id,
             ))
 
     def list_sessions(self, active_only: bool = False) -> list[dict[str, Any]]:
@@ -204,15 +242,19 @@ class TrendStorage:
                     peak_time, clip_start, clip_end, duration, confidence_score,
                     demand_score, raw_clip_path, shorts_clip_path, thumbnail_path,
                     title, titles_json, description, tags_json, transcript,
-                    status, copyright_confirmed, youtube_video_id, created_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    status, copyright_confirmed, youtube_video_id, created_at,
+                    why_selected, quality_check_passed, quality_issues_json,
+                    views_count, likes_count
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """, (
                 clip.clip_id, clip.session_id, clip.channel_name, clip.platform, clip.stream_url,
                 clip.peak_time, clip.clip_start, clip.clip_end, clip.duration, clip.confidence_score,
                 clip.demand_score, clip.raw_clip_path, clip.shorts_clip_path, clip.thumbnail_path,
                 clip.title, json.dumps(clip.titles), clip.description, json.dumps(clip.tags),
                 clip.transcript, clip.status, 1 if clip.copyright_confirmed else 0,
-                clip.youtube_video_id, clip.created_at,
+                clip.youtube_video_id, clip.created_at, clip.why_selected,
+                1 if clip.quality_check_passed else 0, json.dumps(clip.quality_issues),
+                clip.views_count, clip.likes_count,
             ))
 
     def get_clip(self, clip_id: str) -> ViralClipRecord | None:
@@ -276,6 +318,7 @@ class TrendStorage:
                 history = json.loads(r["viewer_history_json"])
             except Exception:
                 pass
+        cols = r.keys()
         return ChannelProfile(
             id=r["id"],
             channel_name=r["channel_name"],
@@ -293,6 +336,9 @@ class TrendStorage:
             thumbnail_url=r["thumbnail_url"] or "",
             last_checked_at=r["last_checked_at"],
             auto_monitor=bool(r["auto_monitor"]),
+            custom_priority=r["custom_priority"] if "custom_priority" in cols else 1,
+            is_rapid_growing=bool(r["is_rapid_growing"]) if "is_rapid_growing" in cols else False,
+            engagement_density=r["engagement_density"] if "engagement_density" in cols else 0.0,
         )
 
     def _row_to_clip(self, r: sqlite3.Row) -> ViralClipRecord:
@@ -308,6 +354,14 @@ class TrendStorage:
                 tags = json.loads(r["tags_json"])
             except Exception:
                 pass
+        issues = []
+        cols = r.keys()
+        if "quality_issues_json" in cols and r["quality_issues_json"]:
+            try:
+                issues = json.loads(r["quality_issues_json"])
+            except Exception:
+                pass
+
         return ViralClipRecord(
             clip_id=r["clip_id"],
             session_id=r["session_id"],
@@ -332,4 +386,9 @@ class TrendStorage:
             copyright_confirmed=bool(r["copyright_confirmed"]),
             youtube_video_id=r["youtube_video_id"],
             created_at=r["created_at"],
+            why_selected=r["why_selected"] if "why_selected" in cols else "",
+            quality_check_passed=bool(r["quality_check_passed"]) if "quality_check_passed" in cols else True,
+            quality_issues=issues,
+            views_count=r["views_count"] if "views_count" in cols else 0,
+            likes_count=r["likes_count"] if "likes_count" in cols else 0,
         )

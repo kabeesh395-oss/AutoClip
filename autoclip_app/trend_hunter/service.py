@@ -7,7 +7,10 @@ from typing import Any
 
 from ..youtube import upload_public_video, youtube_status
 from .discovery import ChannelDiscoveryService
-from .models import ChannelProfile, LiveSessionState, TrendHunterConfig, ViralClipRecord
+from .learning import FeedbackLearner
+from .models import AutomationMode, ChannelProfile, LiveSessionState, TrendHunterConfig, ViralClipRecord
+from .queue_worker import PersistentJobQueue, ResourceGuard
+from .ranking import ChannelRanker, PeriodicRankingScheduler
 from .storage import TrendStorage
 from .stream_monitor import LiveStreamMonitorSession
 
@@ -18,21 +21,25 @@ ROOT = Path(__file__).resolve().parents[2]
 
 class TrendHunterService:
     """
-    Central orchestration service for Trend Hunter & Automatic Viral Clip Extraction.
-    Coordinates:
-      - Channel Discovery (YouTube & Twitch)
-      - Simultaneous Multi-Stream Live Monitoring
-      - Autonomous Viral Spike Detection & Pre/Post-roll Clipping
-      - Review Queue Management
+    Central orchestration service for Phase 2 Autonomous Viral Intelligence:
+      - Smart Channel Ranking & Rapid Growth Detection
+      - Multi-Stream Live Monitoring with Velocity Acceleration Prediction
+      - Feedback Learning Loop from Human Actions & YouTube Analytics
+      - Configurable Automation Levels (Manual, Semi-Auto, Full-Auto)
+      - Resilient SQLite Job Queue with Resource Guard
       - Safe YouTube Shorts Publishing Integration
     """
 
     def __init__(self, storage: TrendStorage | None = None) -> None:
         self.storage = storage or TrendStorage()
         self.discovery = ChannelDiscoveryService()
+        self.feedback_learner = FeedbackLearner(self.storage.db_path)
+        self.ranker = ChannelRanker(storage=self.storage, discovery=self.discovery)
+        self.job_queue = PersistentJobQueue(db_path=self.storage.db_path, resource_guard=ResourceGuard())
+        self.ranking_scheduler = PeriodicRankingScheduler(self.ranker, refresh_interval_seconds=90.0)
+
         self.active_monitors: dict[str, LiveStreamMonitorSession] = {}
         self.default_config = TrendHunterConfig()
-        self._background_tasks: list[asyncio.Task] = []
         self._is_running = False
 
     def initialize_default_channels(self) -> None:
@@ -42,6 +49,9 @@ class TrendHunterService:
             trending = self.discovery.get_trending_channels(refresh_live_status=False)
             for ch in trending:
                 self.storage.upsert_channel(ch)
+        # Start background services
+        self.job_queue.start_worker()
+        self.ranking_scheduler.start()
 
     def search_channels(self, query: str, platform: str | None = None) -> list[dict[str, Any]]:
         """Searches for channels and immediately updates their profile."""
@@ -51,15 +61,24 @@ class TrendHunterService:
         return [p.to_dict() for p in profiles]
 
     def list_tracked_channels(self) -> list[dict[str, Any]]:
-        """Returns all tracked channels with their latest live status and demand scores."""
-        channels = self.storage.list_channels()
+        """Returns all tracked channels sorted by composite intelligent ranking."""
+        channels = self.ranker.rank_channels()
         return [c.to_dict() for c in channels]
+
+    def set_channel_priority(self, channel_id: str, priority: int) -> bool:
+        """Updates channel priority tier (1=Normal, 2=High, 3=Critical Pin)."""
+        return self.storage.set_channel_priority(channel_id, priority)
+
+    def set_automation_level(self, mode: AutomationMode) -> AutomationMode:
+        """Configures workflow autonomy: MANUAL, SEMI_AUTO, FULL_AUTO."""
+        self.default_config.automation_level = mode
+        logger.info("Automation level set to: %s", mode)
+        return mode
 
     def add_channel(self, query: str, platform: str | None = None) -> dict[str, Any]:
         """Discovers and adds a new channel to active tracking."""
         results = self.discovery.search_channels(query, platform=platform)
         if not results:
-            # Fallback manual channel profile creation
             handle = query.lstrip("@").strip()
             ch_plat = platform.lower() if platform else "youtube"
             prof = ChannelProfile(
@@ -106,6 +125,7 @@ class TrendHunterService:
             config=cfg,
             source_video_fallback=source_video_fallback,
             is_simulation=is_simulation,
+            feedback_learner=self.feedback_learner,
         )
         self.active_monitors[channel_id] = monitor
         state = await monitor.start()
@@ -121,18 +141,21 @@ class TrendHunterService:
 
     def get_global_status(self) -> dict[str, Any]:
         """Returns consolidated dashboard telemetry."""
-        channels = self.storage.list_channels()
+        channels = self.ranker.rank_channels()
         active_sessions = [m.state.to_dict() for m in self.active_monitors.values() if m._is_running]
         recent_clips = [c.to_dict() for c in self.storage.list_clips(limit=10)]
         yt_stat = youtube_status()
+        weights = self.feedback_learner.current_weights.to_dict()
 
         return {
             "monitored_streams_count": len(active_sessions),
             "total_tracked_channels": len(channels),
+            "automation_level": self.default_config.automation_level,
             "active_sessions": active_sessions,
             "tracked_channels": [c.to_dict() for c in channels],
             "recent_clips": recent_clips,
             "youtube_status": yt_stat,
+            "learning_weights": weights,
         }
 
     def list_review_queue(self, status: str | None = None, limit: int = 50) -> list[dict[str, Any]]:
@@ -143,13 +166,22 @@ class TrendHunterService:
     def update_clip_metadata(self, clip_id: str, title: str | None = None, description: str | None = None) -> bool:
         return self.storage.update_clip_status(clip_id=clip_id, status="PENDING_REVIEW", title=title, description=description)
 
-    def reject_clip(self, clip_id: str) -> bool:
+    def reject_clip(self, clip_id: str, reason: str = "") -> bool:
+        """Rejects a clip and trains adaptive weights with negative feedback."""
+        clip = self.storage.get_clip(clip_id)
+        if clip:
+            self.feedback_learner.record_feedback(
+                clip_id=clip_id,
+                user_action="REJECTED",
+                features={"confidence_score": clip.confidence_score, "demand_score": clip.demand_score},
+                notes=reason,
+            )
         return self.storage.update_clip_status(clip_id=clip_id, status="REJECTED")
 
     def approve_and_publish_clip(self, clip_id: str, copyright_confirmed: bool = True) -> dict[str, Any]:
         """
         Safe publishing workflow:
-        Enforces explicit copyright & permission confirmation before publishing to YouTube Shorts.
+        Enforces copyright rights confirmation before upload, records positive feedback.
         """
         if not copyright_confirmed:
             raise ValueError("You must confirm copyright permissions before publishing.")
@@ -180,6 +212,13 @@ class TrendHunterService:
             youtube_video_id=video_id,
         )
 
+        # Train feedback weights with positive publication signal
+        self.feedback_learner.record_feedback(
+            clip_id=clip_id,
+            user_action="PUBLISHED",
+            features={"confidence_score": clip.confidence_score, "demand_score": clip.demand_score},
+        )
+
         return {
             "status": "PUBLISHED",
             "clip_id": clip_id,
@@ -187,6 +226,10 @@ class TrendHunterService:
             "youtube_url": f"https://www.youtube.com/shorts/{video_id}" if video_id != "published" else None,
             "message": "Clip successfully approved and published to YouTube Shorts!",
         }
+
+    def sync_performance_analytics(self) -> int:
+        """Fetches views/likes for published clips and adjusts AI weights."""
+        return self.feedback_learner.fetch_youtube_analytics_for_published_clips()
 
 
 # Global singleton instance
