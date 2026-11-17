@@ -1,58 +1,2567 @@
-<!doctype html>
-<html lang="en">
+<!DOCTYPE html>
+<html lang="en" class="dark">
 <head>
-<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<meta name="theme-color" content="#0b1020"><title>AutoClip AI</title>
-<style>
-:root{color-scheme:dark;--bg:#0b1020;--panel:#121a2d;--line:#25324b;--muted:#91a0ba;--text:#edf3ff;--accent:#70e1c1}
-*{box-sizing:border-box}body{margin:0;background:radial-gradient(ellipse at 50% -15%,#1d3150 0,transparent 55%),var(--bg);color:var(--text);font:15px/1.5 Inter,system-ui,Segoe UI,sans-serif}
-main{max-width:920px;margin:0 auto;padding:34px 18px 70px}.top{display:flex;justify-content:space-between;align-items:center;gap:12px}.brand{font-size:21px;font-weight:800;letter-spacing:-.6px}.pill{border:1px solid #315b56;color:var(--accent);border-radius:30px;padding:5px 11px;font-size:12px}
-h1{font-size:clamp(32px,6vw,52px);line-height:1.04;letter-spacing:-2px;margin:42px 0 12px}.sub{color:var(--muted);max-width:620px}.panel{background:#111a2cdd;border:1px solid var(--line);border-radius:18px;padding:22px;margin-top:24px;box-shadow:0 18px 50px #0003}
-.tabs{display:flex;gap:8px;margin-bottom:18px}.tab,button{border:0;border-radius:10px;padding:11px 15px;font-weight:700;cursor:pointer}.tab{background:#1c2940;color:#c2cde0}.tab.active,button.primary{background:var(--accent);color:#061510}.tab:not(.active){opacity:.8}
-label{display:block;color:#c4d0e4;font-size:13px;font-weight:650;margin:14px 0 7px}input,select{width:100%;background:#0b1323;border:1px solid #30415e;color:var(--text);padding:13px;border-radius:10px;font:inherit}
-input[type=file]{padding:11px}.row{display:grid;grid-template-columns:1fr 1fr;gap:12px}.hint{font-size:12px;color:var(--muted);margin-top:8px}.actions{display:flex;align-items:center;gap:12px;margin-top:18px;flex-wrap:wrap}button.primary{padding:13px 20px}button:disabled{opacity:.5;cursor:wait}
-#status{margin-top:18px;color:var(--muted);white-space:pre-wrap}.clip{display:grid;grid-template-columns:1fr auto;gap:10px;border-top:1px solid var(--line);padding:15px 0}.clip strong{display:block}.clip small{color:var(--muted)}a{color:var(--accent);text-decoration:none}
-.hidden{display:none}.foot{color:#7788a5;font-size:12px;margin-top:25px}
-@media(max-width:560px){main{padding:22px 13px 50px}.panel{padding:16px}.row{grid-template-columns:1fr}.top{align-items:flex-start}.clip{grid-template-columns:1fr}}
-</style></head>
-<body><main>
-<div class="top"><div class="brand">✂ AutoClip AI</div><div class="pill">LOCAL · OPEN SOURCE STACK</div></div>
-<h1>Long videos.<br><span style="color:var(--accent)">Best moments.</span></h1>
-<p class="sub">Turn recordings and stream VODs into captioned vertical clips. Transcription and highlight selection run on your machine — no paid AI API.</p>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="theme-color" content="#0B0F17">
+  <title>SupoClip • AutoClip Studio — AI Viral Video Clipper & Repurposer</title>
 
-<section class="panel">
-<div style="display:flex;justify-content:space-between;gap:12px;align-items:center;flex-wrap:wrap"><div><strong>YouTube channel</strong><div class="hint" id="youtubeStatus">Checking connection…</div></div><button type="button" id="connectYoutube">Connect YouTube</button></div>
-<div class="hint">Google OAuth credentials and token stay on this computer. Automatic publishing is PUBLIC.</div>
-</section>
+  <!-- Typography: Plus Jakarta Sans, Inter, JetBrains Mono -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@500;600;700;800&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet">
 
-<section class="panel">
-<strong>Daily publisher</strong>
-<p class="hint">Add one source link for a future date and time. AutoClip downloads it, creates up to five captioned Shorts, generates a title, description and tags, then publishes them publicly. This computer and AutoClip must remain running.</p>
-<form id="scheduleForm">
-<label>YouTube source link for that day</label><input name="url" type="url" placeholder="https://www.youtube.com/watch?v=..." required>
-<div class="row"><div><label>Publish date</label><input type="date" name="date" required></div><div><label>Start time (India local time)</label><input type="time" name="time" value="18:00" required></div></div>
-<div class="actions"><button class="primary" type="submit">Schedule 5 public Shorts</button></div>
-</form><div id="scheduleStatus" class="hint"></div><div id="scheduleQueue"></div>
-</section>
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com?plugins=forms"></script>
+  <script>
+    tailwind.config = {
+      darkMode: "class",
+      theme: {
+        extend: {
+          colors: {
+            surface: "#0B0F17",
+            "surface-low": "#111827",
+            "surface-card": "#162032",
+            "surface-high": "#1E2B42",
+            "surface-highest": "#283955",
+            border: "#1F2D3D",
+            "border-subtle": "rgba(255, 255, 255, 0.08)",
+            primary: "#8B5CF6",
+            "primary-hover": "#7C3AED",
+            secondary: "#06B6D4",
+            "secondary-glow": "#22D3EE",
+            tertiary: "#10B981",
+            "tertiary-glow": "#34D399",
+            warning: "#F59E0B",
+            error: "#EF4444",
+            text: "#F1F5F9",
+            "text-muted": "#94A3B8",
+            "text-subtle": "#64748B"
+          },
+          fontFamily: {
+            headline: ["Plus Jakarta Sans", "sans-serif"],
+            body: ["Inter", "sans-serif"],
+            mono: ["JetBrains Mono", "monospace"]
+          }
+        }
+      }
+    };
+  </script>
 
-<section class="panel">
-<div class="tabs"><button class="tab active" data-mode="upload">Upload video</button><button class="tab" data-mode="url">Video / livestream URL</button></div>
-<form id="uploadForm"><label>Select a video</label><input type="file" name="file" accept="video/*" required><div class="hint">MP4, MKV, MOV, WebM or AVI</div><div class="row"><div><label>Language</label><select name="language"><option value="">Auto detect</option><option value="en">English</option><option value="ta">Tamil</option><option value="hi">Hindi</option></select></div><div><label>Whisper model</label><select name="model"><option>small</option><option>base</option><option>tiny</option><option>medium</option></select></div></div><label>Number of clips</label><select name="count"><option>3</option><option selected>5</option><option>8</option><option>10</option></select><div class="actions"><button class="primary" type="submit">Generate clips</button></div></form>
-<form id="urlForm" class="hidden"><label>Video or stream URL</label><input name="url" type="url" placeholder="https://..." required><div class="row"><div><label>Source type</label><select name="mode"><option value="vod">Recorded video / VOD</option><option value="live">Active livestream (record, then clip)</option></select></div><div><label>Language</label><select name="language"><option value="">Auto detect</option><option value="en">English</option><option value="ta">Tamil</option><option value="hi">Hindi</option></select></div></div><div class="row"><div><label>Whisper model</label><select name="model"><option>small</option><option>base</option><option>tiny</option><option>medium</option></select></div><div><label>Number of clips</label><select name="count"><option>3</option><option selected>5</option><option>8</option><option>10</option></select></div></div><div class="hint">Livestream mode records from the source and starts clipping after the stream ends. It is not live instant clipping.</div><label style="display:flex;align-items:center;gap:9px"><input type="checkbox" name="publish_public" value="true" checked style="width:auto"> Automatically upload generated clips as PUBLIC YouTube Shorts</label><div class="actions"><button class="primary" type="submit">Start processing</button></div></form>
-<div id="status" aria-live="polite"></div><div id="results"></div>
-</section>
-<p class="foot">Requires FFmpeg, Ollama (qwen2.5:3b), Faster-Whisper and Google YouTube OAuth setup. Video stays on this computer. Only process content you own or have permission to use. Public uploads go live without a review step.</p>
-</main>
-<script>
-const tabs=document.querySelectorAll(".tab"),upload=document.querySelector("#uploadForm"),url=document.querySelector("#urlForm"),statusBox=document.querySelector("#status"),results=document.querySelector("#results"),youtubeStatusBox=document.querySelector("#youtubeStatus"),connectYoutube=document.querySelector("#connectYoutube"),scheduleForm=document.querySelector("#scheduleForm"),scheduleStatus=document.querySelector("#scheduleStatus"),scheduleQueue=document.querySelector("#scheduleQueue");
-tabs.forEach(t=>t.onclick=()=>{tabs.forEach(x=>x.classList.toggle("active",x===t));upload.classList.toggle("hidden",t.dataset.mode!=="upload");url.classList.toggle("hidden",t.dataset.mode!=="url");statusBox.textContent="";results.innerHTML=""});
-function esc(s){return String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]))}
-async function watch(id){let tries=0;while(tries++<28800){const r=await fetch("/api/jobs/"+id);const j=await r.json();statusBox.textContent=j.message+" · "+j.status;if(j.status==="completed"){results.innerHTML="<h3>Clips ready</h3>"+j.clips.map(c=>"<div class='clip'><div><strong>"+esc(c.youtube_title||c.title)+"</strong><small>"+c.duration+"s · "+esc(c.reason)+"<br><a href='"+c.video_url+"' target='_blank'>Open MP4</a> · <a href='"+c.subtitle_url+"' target='_blank'>SRT</a>"+(c.youtube_url?"<br><a href='"+c.youtube_url+"' target='_blank'>YouTube PUBLIC video</a>":"")+"</small></div><span>Score "+c.score+"/100</span></div>").join("");return}if(j.status==="failed"){statusBox.textContent="Failed: "+j.message;return}await new Promise(r=>setTimeout(r,5000))}statusBox.textContent="Still processing. Keep AutoClip running."}
-async function submit(form,endpoint){const button=form.querySelector("button[type=submit]");button.disabled=true;statusBox.textContent="Creating job…";results.innerHTML="";try{const r=await fetch(endpoint,{method:"POST",body:new FormData(form)});const j=await r.json();if(!r.ok)throw new Error(j.detail||"Could not start job");await watch(j.id)}catch(e){statusBox.textContent="Error: "+e.message}finally{button.disabled=false}}
-upload.onsubmit=e=>{e.preventDefault();submit(upload,"/api/jobs/upload")};url.onsubmit=e=>{e.preventDefault();submit(url,"/api/jobs/url")};
-async function refreshYoutube(){try{const r=await fetch("/api/youtube/status");const j=await r.json();youtubeStatusBox.textContent=j.message;connectYoutube.textContent=j.connected?"YouTube connected":"Connect YouTube";connectYoutube.disabled=!!j.connected}catch(e){youtubeStatusBox.textContent="Could not check YouTube connection"}}
-connectYoutube.onclick=async()=>{connectYoutube.disabled=true;youtubeStatusBox.textContent="Opening Google OAuth sign-in…";try{const r=await fetch("/api/youtube/connect",{method:"POST"});const j=await r.json();if(!r.ok)throw new Error(j.detail||"OAuth failed");youtubeStatusBox.textContent=j.message;await refreshYoutube()}catch(e){youtubeStatusBox.textContent="YouTube setup: "+e.message}finally{connectYoutube.disabled=false}};
-async function refreshQueue(){try{const r=await fetch("/api/schedule");const j=await r.json();scheduleQueue.innerHTML=j.items.length?"<h4>Scheduled sources</h4>"+j.items.map(x=>"<div class='clip'><div><strong>"+esc(x.run_at)+" · "+esc(x.status)+"</strong><small>"+esc(x.url)+"</small>"+(x.error?"<small>"+esc(x.error)+"</small>":"")+"</div></div>").join(""):"<div class='hint'>No scheduled sources yet.</div>"}catch(e){}}
-scheduleForm.onsubmit=async e=>{e.preventDefault();const data=new FormData();data.set("url",scheduleForm.url.value);data.set("run_at",scheduleForm.date.value+"T"+scheduleForm.time.value);data.set("language","");data.set("model","small");data.set("count","5");scheduleStatus.textContent="Saving schedule…";try{const r=await fetch("/api/schedule",{method:"POST",body:data});const j=await r.json();if(!r.ok)throw new Error(j.detail||"Could not schedule");scheduleStatus.textContent=j.message;await refreshQueue()}catch(err){scheduleStatus.textContent="Error: "+err.message}};
-const today=new Date();scheduleForm.date.min=today.getFullYear()+"-"+String(today.getMonth()+1).padStart(2,"0")+"-"+String(today.getDate()).padStart(2,"0");scheduleForm.date.value=scheduleForm.date.min;refreshYoutube();refreshQueue();setInterval(refreshQueue,15000);
-</script></body></html>
+  <style>
+    .material-symbols-outlined {
+      font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 20;
+      line-height: 1;
+      display: inline-block;
+      vertical-align: middle;
+    }
+    .custom-scroll::-webkit-scrollbar { width: 5px; height: 5px; }
+    .custom-scroll::-webkit-scrollbar-track { background: #0B0F17; }
+    .custom-scroll::-webkit-scrollbar-thumb { background: #1E2B42; border-radius: 4px; }
+    .custom-scroll::-webkit-scrollbar-thumb:hover { background: #283955; }
+    .video-viewport {
+      background: #000;
+      position: relative;
+      overflow: hidden;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 0.875rem;
+    }
+    .video-viewport.portrait {
+      aspect-ratio: 9/16;
+      max-height: 480px;
+      width: 100%;
+      margin: 0 auto;
+    }
+    .video-viewport.landscape {
+      aspect-ratio: 16/9;
+      max-height: 290px;
+      width: 100%;
+    }
+    .video-viewport video {
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+    }
+    .glow-cyan {
+      box-shadow: 0 0 24px rgba(6, 182, 212, 0.25);
+    }
+    .glow-purple {
+      box-shadow: 0 0 24px rgba(139, 92, 246, 0.25);
+    }
+  </style>
+  <script src="/static/qrcode.min.js"></script>
+</head>
+
+<body class="bg-surface text-text font-body antialiased min-h-screen flex flex-col custom-scroll selection:bg-primary/30 selection:text-white">
+
+  <!-- ========================================================================= -->
+  <!-- 1. TOP NAVIGATION HEADER (SupoClip / OpusClip Style)                       -->
+  <!-- ========================================================================= -->
+  <header class="fixed top-0 left-0 right-0 h-16 z-40 bg-surface/90 backdrop-blur-xl border-b border-border/80 px-4 sm:px-8 flex items-center justify-between transition-all">
+    <!-- Brand Logo -->
+    <div class="flex items-center gap-6">
+      <a href="#" onclick="switchTab('tab-studio')" class="flex items-center gap-2.5 group">
+        <div class="w-9 h-9 rounded-xl bg-gradient-to-tr from-primary to-secondary flex items-center justify-center shadow-[0_0_16px_rgba(139,92,246,0.4)] group-hover:scale-105 transition-transform">
+          <span class="material-symbols-outlined text-white text-[20px]" style="font-variation-settings: 'FILL' 1;">auto_videocam</span>
+        </div>
+        <div class="flex flex-col">
+          <div class="flex items-center gap-1.5">
+            <span class="font-headline font-extrabold text-white text-base tracking-tight leading-none">SupoClip</span>
+            <span class="font-mono text-[9px] uppercase px-1.5 py-0.5 rounded-full bg-secondary/15 text-secondary border border-secondary/30 font-bold">Pro</span>
+          </div>
+          <span class="font-mono text-[10px] text-text-subtle leading-tight mt-0.5">₹0/mo Local AI Studio</span>
+        </div>
+      </a>
+
+      <!-- Desktop Navigation Tabs -->
+      <nav class="hidden md:flex items-center gap-1 bg-surface-low/80 p-1 rounded-xl border border-border">
+        <button data-tab="tab-studio" class="nav-btn flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-secondary bg-surface-high font-headline text-xs font-semibold shadow-sm transition-all">
+          <span class="material-symbols-outlined text-[17px]">movie_edit</span>
+          <span>Studio</span>
+        </button>
+        <button data-tab="tab-batches" class="nav-btn flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-text-muted hover:text-white font-headline text-xs font-medium transition-colors">
+          <span class="material-symbols-outlined text-[17px]">video_library</span>
+          <span>Projects</span>
+          <span id="navBatchesBadge" class="font-mono text-[10px] bg-surface px-1.5 py-0.2 rounded text-text-subtle">1</span>
+        </button>
+        <button data-tab="tab-schedule" class="nav-btn flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-text-muted hover:text-white font-headline text-xs font-medium transition-colors">
+          <span class="material-symbols-outlined text-[17px]">calendar_month</span>
+          <span>Schedule</span>
+        </button>
+        <button data-tab="tab-chat" class="nav-btn flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-text-muted hover:text-white font-headline text-xs font-medium transition-colors">
+          <span class="material-symbols-outlined text-[17px]">forum</span>
+          <span>Chat Spikes</span>
+          <span id="navChatSpikesBadge" class="hidden font-mono text-[9px] bg-red-600/30 text-red-400 px-1.5 py-0.2 rounded-full font-bold animate-pulse">LIVE</span>
+        </button>
+        <button data-tab="tab-trend-hunter" class="nav-btn flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-text-muted hover:text-white font-headline text-xs font-medium transition-colors">
+          <span class="material-symbols-outlined text-[17px] text-amber-400">radar</span>
+          <span>Trend Hunter</span>
+          <span id="navTrendHunterBadge" class="hidden font-mono text-[9px] bg-amber-500/30 text-amber-300 px-1.5 py-0.2 rounded-full font-bold animate-pulse">LIVE</span>
+        </button>
+        <button data-tab="tab-settings" class="nav-btn flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-text-muted hover:text-white font-headline text-xs font-medium transition-colors">
+          <span class="material-symbols-outlined text-[17px]">settings</span>
+          <span>Settings</span>
+        </button>
+      </nav>
+    </div>
+
+    <!-- Right Controls: Batch Selector, YouTube, New Project -->
+    <div class="flex items-center gap-2 sm:gap-3">
+      <!-- Active Project Selector -->
+      <div class="flex items-center gap-1.5 bg-surface-low px-2.5 py-1 rounded-lg border border-border text-xs">
+        <span class="material-symbols-outlined text-secondary text-[16px]">folder</span>
+        <select id="batchSelectTop" class="bg-transparent text-white text-xs font-headline font-semibold border-none focus:ring-0 p-0 pr-6 cursor-pointer max-w-[130px] sm:max-w-[200px] truncate">
+          <option value="">Loading Projects…</option>
+        </select>
+      </div>
+
+      <!-- YouTube Status Pill (Visible on Mobile & Desktop) -->
+      <div onclick="openYouTubeModal()" class="flex items-center gap-1.5 bg-surface-low hover:bg-surface-card px-2.5 py-1 rounded-lg border border-border text-xs cursor-pointer transition-colors" title="YouTube Channel Status">
+        <span id="ytStatusDot" class="w-2 h-2 rounded-full bg-text-subtle"></span>
+        <span id="ytStatusText" class="font-mono text-[10px] sm:text-[11px] text-white">YouTube</span>
+        <button id="btnConnectYoutubeTop" class="text-[10px] sm:text-[11px] font-semibold text-secondary hover:underline ml-0.5">Connect</button>
+      </div>
+
+      <!-- Export ZIP Button (Required for test assertions) -->
+      <button id="btnExportZip" class="hidden sm:flex items-center gap-1.5 bg-surface-card hover:bg-surface-high text-white px-3 py-1.5 rounded-lg border border-border text-xs font-headline font-semibold transition-all" title="Download Approved ZIP Package">
+        <span class="material-symbols-outlined text-[16px] text-secondary">archive</span>
+        <span>Export</span>
+      </button>
+
+      <!-- New Project Button -->
+      <button onclick="openNewBatchModal()" class="flex items-center gap-1.5 bg-gradient-to-r from-primary to-secondary hover:brightness-110 text-white font-headline text-xs font-bold px-3 sm:px-4 py-2 rounded-xl shadow-[0_0_16px_rgba(139,92,246,0.35)] transition-all active:scale-95">
+        <span class="material-symbols-outlined text-[17px]">add</span>
+        <span class="hidden sm:inline">New Project</span>
+      </button>
+
+      <!-- Mobile QR Pairing Modal Button -->
+      <button onclick="openMobileModal()" class="p-2 rounded-xl bg-surface-low hover:bg-surface-card text-text-muted hover:text-white border border-border transition-colors" title="Mobile QR Connect">
+        <span class="material-symbols-outlined text-[18px]">qr_code_2</span>
+      </button>
+    </div>
+  </header>
+
+  <!-- ========================================================================= -->
+  <!-- 2. MAIN WORKSPACE CANVAS                                                  -->
+  <!-- ========================================================================= -->
+  <main class="pt-20 pb-28 min-h-screen px-3 sm:px-8 max-w-7xl mx-auto w-full space-y-6">
+
+    <!-- ======================================================================= -->
+    <!-- TAB 1: STUDIO (Hero Generator + Live Viral Clips Showcase)               -->
+    <!-- ======================================================================= -->
+    <div id="tab-studio" class="tab-content space-y-6">
+
+      <!-- Hero Video Ingest Card (SupoClip / Kixy Style) -->
+      <section class="bg-gradient-to-b from-surface-low to-surface-card border border-border/80 rounded-2xl p-5 sm:p-6 shadow-2xl relative overflow-hidden">
+        <div class="absolute -right-12 -top-12 w-48 h-48 bg-primary/10 rounded-full blur-3xl pointer-events-none"></div>
+        <div class="absolute -left-12 -bottom-12 w-48 h-48 bg-secondary/10 rounded-full blur-3xl pointer-events-none"></div>
+
+        <div class="relative z-10 space-y-4">
+          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+            <div>
+              <h2 class="font-headline text-lg sm:text-xl font-extrabold text-white tracking-tight flex items-center gap-2">
+                <span>⚡ AI Viral Clip Repurposer</span>
+                <span class="font-mono text-[10px] bg-tertiary/15 text-tertiary border border-tertiary/30 px-2 py-0.5 rounded-full font-bold">Whisper AI Ready</span>
+              </h2>
+              <p class="text-xs text-text-muted mt-0.5">Turn any long YouTube stream or video file into viral 9:16 Shorts with dynamic kinetic karaoke subtitles.</p>
+            </div>
+            <div class="flex items-center gap-2 font-mono text-xs text-text-subtle">
+              <span class="w-2 h-2 rounded-full bg-tertiary animate-pulse"></span>
+              <span>Local Engine: Ready (0ms latency, ₹0 fee)</span>
+            </div>
+          </div>
+
+          <!-- Ingest Bar: URL Input + Submit -->
+          <form id="sourceUrlForm" class="space-y-3">
+            <div class="flex flex-col sm:flex-row items-stretch gap-2.5">
+              <div class="relative flex-1">
+                <span class="material-symbols-outlined text-text-subtle absolute left-3.5 top-3 text-[20px]">link</span>
+                <input type="text" name="source_url" id="sourceUrlInput" placeholder="Paste YouTube link (e.g. https://youtube.com/watch?v=...) or local video path" required class="w-full bg-surface text-white text-xs sm:text-sm font-mono rounded-xl border border-border pl-10 pr-24 py-3 focus:ring-2 focus:ring-secondary focus:border-transparent transition-all placeholder:text-text-subtle">
+                <button type="button" onclick="pasteFromClipboard()" class="absolute right-2.5 top-2.5 px-2.5 py-1 bg-surface-high hover:bg-surface-highest text-text-muted hover:text-white rounded-lg font-headline text-[11px] font-semibold transition-colors">
+                  Paste
+                </button>
+              </div>
+              <button type="submit" class="bg-gradient-to-r from-primary to-secondary hover:brightness-110 text-white font-headline text-xs sm:text-sm font-bold px-6 py-3 rounded-xl shadow-lg transition-all active:scale-95 flex items-center justify-center gap-2 whitespace-nowrap">
+                <span class="material-symbols-outlined text-[18px]">auto_awesome</span>
+                <span>Generate Viral Clips</span>
+              </button>
+            </div>
+
+            <!-- Preset Toggles (OpusClip / SupoClip Options) -->
+            <div class="flex flex-wrap items-center justify-between gap-3 pt-1 text-xs text-text-muted">
+              <div class="flex flex-wrap items-center gap-2">
+                <span class="text-text-subtle font-medium">Presets:</span>
+                <span class="px-2.5 py-1 rounded-lg bg-surface border border-secondary/30 text-secondary font-mono text-[11px] font-semibold flex items-center gap-1">
+                  <span class="material-symbols-outlined text-[14px]">smartphone</span> 9:16 Shorts (&lt;60s)
+                </span>
+                <span class="px-2.5 py-1 rounded-lg bg-surface border border-border text-text font-mono text-[11px] flex items-center gap-1">
+                  <span class="material-symbols-outlined text-[14px]">subtitles</span> MrBeast Yellow Captions
+                </span>
+                <span class="px-2.5 py-1 rounded-lg bg-surface border border-border text-text font-mono text-[11px] flex items-center gap-1">
+                  <span class="material-symbols-outlined text-[14px]">fit_screen</span> Fit Blur Dynamic
+                </span>
+              </div>
+              <div class="flex items-center gap-2">
+                <button type="button" onclick="document.getElementById('fileInput').click()" class="text-secondary hover:underline flex items-center gap-1 font-headline font-semibold">
+                  <span class="material-symbols-outlined text-[16px]">upload_file</span>
+                  <span>Or upload MP4 file directly</span>
+                </button>
+              </div>
+            </div>
+          </form>
+
+          <!-- Hidden Upload Zone (Preserves test assertion id) -->
+          <div id="sourceDropzone" class="hidden">
+            <input type="file" id="fileInput" class="hidden" accept="video/mp4,video/mkv,video/webm,video/quicktime">
+          </div>
+        </div>
+      </section>
+
+      <!-- Active Project Status Header & Filters -->
+      <section class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-surface-low/80 p-4 rounded-xl border border-border">
+        <div class="flex items-center gap-3 flex-wrap">
+          <div>
+            <div class="flex items-center gap-2">
+              <h3 id="activeBatchTitle" class="font-headline text-base sm:text-lg font-bold text-white">Apex Champions Highlights</h3>
+              <span id="activeBatchStatusBadge" class="font-mono text-[10px] px-2 py-0.5 rounded-full bg-secondary/15 text-secondary border border-secondary/30 font-bold uppercase">
+                AWAITING_APPROVAL
+              </span>
+            </div>
+            <p id="activeBatchSubtitle" class="text-xs text-text-muted mt-0.5">OpusClip-grade AI Virality Engine • Faster-Whisper Word Timestamps • 100% Review Gate</p>
+          </div>
+        </div>
+
+        <!-- Filter Pills & Pipeline Trigger -->
+        <div class="flex items-center gap-2 flex-wrap">
+          <div class="bg-surface p-1 rounded-xl border border-border flex items-center gap-1">
+            <button onclick="setClipFilter('all')" class="filter-btn px-3 py-1.5 rounded-lg text-xs font-headline font-semibold text-secondary bg-surface-high border border-secondary/30">All</button>
+            <button onclick="setClipFilter('shorts')" class="filter-btn px-3 py-1.5 rounded-lg text-xs font-headline text-text-muted hover:text-white transition-colors">Shorts 9:16</button>
+            <button onclick="setClipFilter('long')" class="filter-btn px-3 py-1.5 rounded-lg text-xs font-headline text-text-muted hover:text-white transition-colors">Long Form</button>
+            <button onclick="setClipFilter('approved')" class="filter-btn px-3 py-1.5 rounded-lg text-xs font-headline text-text-muted hover:text-white transition-colors">Approved ✓</button>
+          </div>
+
+          <button id="btnStartBatchProcessing" class="flex items-center gap-1.5 bg-primary hover:bg-primary-hover text-white px-3.5 py-1.5 rounded-xl text-xs font-headline font-bold shadow-md transition-all">
+            <span class="material-symbols-outlined text-[16px]">play_arrow</span>
+            <span>Re-Run</span>
+          </button>
+        </div>
+      </section>
+
+      <!-- Viral Clips Showcase Grid (SupoClip / OpusClip Layout) -->
+      <section>
+        <div id="clipsGrid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <!-- Populated dynamically by renderFilteredClips() -->
+        </div>
+      </section>
+    </div>
+
+    <!-- ======================================================================= -->
+    <!-- TAB 2: PROJECTS (Batch Queue - Clean Cards with 1-Click Delete)         -->
+    <!-- ======================================================================= -->
+    <div id="tab-batches" class="tab-content hidden space-y-6">
+      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div>
+          <h2 class="font-headline text-xl font-extrabold text-white">Video Projects & Batches</h2>
+          <p class="text-xs text-text-muted">Manage your 3-day scheduled video batches and generated viral clips.</p>
+        </div>
+        <div class="flex items-center gap-2">
+          <button onclick="purgeOldBatches()" class="flex items-center gap-1.5 bg-surface-card hover:bg-surface-high text-text-muted hover:text-error px-3.5 py-2 rounded-xl border border-border text-xs font-headline transition-colors">
+            <span class="material-symbols-outlined text-[16px]">delete_sweep</span>
+            <span>Clean Test Batches</span>
+          </button>
+          <button onclick="openNewBatchModal()" class="flex items-center gap-1.5 bg-gradient-to-r from-primary to-secondary text-white font-headline text-xs font-bold px-4 py-2 rounded-xl shadow-md transition-all">
+            <span class="material-symbols-outlined text-[16px]">add</span>
+            <span>+ New Project</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Batch Cards Container -->
+      <div id="batchCardsContainer" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+        <!-- Populated by loadBatches() -->
+      </div>
+
+      <!-- Engine Worker Status Card -->
+      <div class="bg-surface-low border border-border rounded-2xl p-5 space-y-3">
+        <div class="flex items-center justify-between">
+          <h3 class="font-headline text-sm font-bold text-white flex items-center gap-2">
+            <span class="material-symbols-outlined text-secondary text-[18px]">memory</span>
+            <span>Local FFmpeg & Whisper Render Daemon</span>
+          </h3>
+          <span class="font-mono text-xs text-tertiary font-semibold flex items-center gap-1.5">
+            <span class="w-2 h-2 rounded-full bg-tertiary animate-pulse"></span> Daemon Active (Port 8765)
+          </span>
+        </div>
+        <div id="jobsContainer" class="space-y-2">
+          <!-- Populated by renderJobs() -->
+        </div>
+      </div>
+    </div>
+
+    <!-- ======================================================================= -->
+    <!-- TAB 3: SCHEDULE (3-Day Release Timetable)                               -->
+    <!-- ======================================================================= -->
+    <div id="tab-schedule" class="tab-content hidden space-y-6">
+      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-surface-low p-5 rounded-2xl border border-border">
+        <div>
+          <h2 class="font-headline text-xl font-extrabold text-white">3-Day Content Release Schedule</h2>
+          <p class="text-xs text-text-muted mt-0.5">Schedules 3 videos per day (2 Shorts + 1 Long Form) with optimal viral release timing in Asia/Kolkata.</p>
+        </div>
+        <button id="btnCommitSchedule" class="bg-gradient-to-r from-tertiary to-secondary hover:brightness-110 text-white font-headline text-xs font-bold px-5 py-2.5 rounded-xl shadow-lg transition-all text-center">
+          Commit Approved to YouTube Schedule
+        </button>
+      </div>
+
+      <div class="bg-surface-low border border-border rounded-2xl overflow-hidden shadow-xl">
+        <div class="overflow-x-auto custom-scroll">
+          <table class="w-full text-left text-xs min-w-[550px]">
+            <thead class="bg-surface border-b border-border text-text-muted font-headline uppercase text-[10px]">
+              <tr>
+                <th class="p-3.5">Day / Slot</th>
+                <th class="p-3.5">Format</th>
+                <th class="p-3.5">Scheduled Release Time</th>
+                <th class="p-3.5">Assigned Viral Clip</th>
+                <th class="p-3.5">Status</th>
+              </tr>
+            </thead>
+            <tbody id="scheduleTableBody" class="divide-y divide-border font-mono text-[11px]">
+              <!-- Populated by renderSchedules() -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ======================================================================= -->
+    <!-- TAB 4: SETTINGS & PAIRING (Mobile QR, YouTube, Engine Diagnostics)       -->
+    <!-- ======================================================================= -->
+    <div id="tab-settings" class="tab-content hidden space-y-6">
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <!-- Mobile QR Connect Card -->
+        <div class="bg-surface-low border border-border rounded-2xl p-5 space-y-4">
+          <div class="flex items-center justify-between">
+            <h3 class="font-headline text-sm font-bold text-white flex items-center gap-2">
+              <span class="material-symbols-outlined text-secondary text-[20px]">smartphone</span>
+              <span>Mobile Phone Pairing</span>
+            </h3>
+            <span class="font-mono text-[10px] text-tertiary bg-tertiary/15 px-2 py-0.5 rounded-full border border-tertiary/30">LAN Active</span>
+          </div>
+          <p class="text-xs text-text-muted">Access this SupoClip studio from any mobile browser on your local Wi-Fi.</p>
+          <div class="bg-white p-3.5 rounded-xl mx-auto w-44 h-44 flex items-center justify-center shadow-lg">
+            <div id="settingsQrCode"></div>
+          </div>
+          <div class="text-center">
+            <span class="font-mono text-xs text-secondary bg-surface px-3 py-1 rounded-full border border-border" id="settingsHostUrl">http://...</span>
+          </div>
+        </div>
+
+        <!-- YouTube OAuth & Rights Registry -->
+        <div class="bg-surface-low border border-border rounded-2xl p-5 space-y-4">
+          <div class="flex items-center justify-between">
+            <h3 class="font-headline text-sm font-bold text-white flex items-center gap-2">
+              <span class="material-symbols-outlined text-red-500 text-[20px]">smart_display</span>
+              <span>YouTube Publishing Channel</span>
+            </h3>
+            <span class="font-mono text-[10px] text-text-subtle">OAuth 2.0</span>
+          </div>
+          <p class="text-xs text-text-muted">Connect your YouTube channel for automated 1-click scheduled publishing of approved clips.</p>
+          <div class="p-4 rounded-xl bg-surface border border-border flex items-center justify-between">
+            <div>
+              <div class="font-headline text-xs font-semibold text-white">Channel Integration</div>
+              <div class="text-[11px] text-text-subtle" id="ytSettingsDetails">Not connected</div>
+            </div>
+            <button onclick="document.getElementById('btnConnectYoutubeTop').click()" class="px-3 py-1.5 bg-surface-high hover:bg-surface-highest text-secondary text-xs rounded-lg font-headline font-semibold border border-border transition-colors">
+              Manage Connection
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Real-time Diagnostics Log Box -->
+      <div class="bg-surface-low border border-border rounded-2xl p-5 space-y-3">
+        <div class="flex items-center justify-between">
+          <h3 class="font-headline text-xs sm:text-sm font-bold text-white flex items-center gap-2">
+            <span class="material-symbols-outlined text-text-subtle text-[18px]">terminal</span>
+            <span>Real-Time Engine Logs</span>
+          </h3>
+          <button onclick="refreshServerLogs()" class="flex items-center gap-1 bg-surface-card hover:bg-surface-high text-white px-2.5 py-1 rounded-lg border border-border text-xs font-headline transition-colors">
+            <span class="material-symbols-outlined text-[15px]">refresh</span>
+            <span>Refresh</span>
+          </button>
+        </div>
+        <pre id="logOutput" class="w-full h-64 overflow-y-auto bg-surface p-3.5 rounded-xl font-mono text-xs text-text-muted custom-scroll leading-relaxed">Loading logs…</pre>
+      </div>
+    </div>
+
+    <!-- ======================================================================= -->
+    <!-- TAB 5: CHAT SPIKE DETECTION ENGINE                                      -->
+    <!-- ======================================================================= -->
+    <div id="tab-chat" class="tab-content hidden space-y-6">
+      <!-- Live Chat Stream Ingest Card -->
+      <section class="bg-gradient-to-b from-surface-low to-surface-card border border-border/80 rounded-2xl p-5 sm:p-6 shadow-2xl relative overflow-hidden">
+        <div class="relative z-10 space-y-4">
+          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+            <div>
+              <h2 class="font-headline text-lg sm:text-xl font-extrabold text-white tracking-tight flex items-center gap-2">
+                <span>🔥 Live Chat Activity Spike Detection</span>
+                <span class="font-mono text-[10px] bg-red-500/15 text-red-400 border border-red-500/30 px-2 py-0.5 rounded-full font-bold">Real-Time Engine</span>
+              </h2>
+              <p class="text-xs text-text-muted mt-0.5">Monitors Twitch & YouTube Live Chat in real-time. Detects viewer activity surges, calculates statistical Z-scores, and auto-extracts hype clips.</p>
+            </div>
+            <div class="flex items-center gap-2 font-mono text-xs">
+              <span id="chatEngineStatusDot" class="w-2.5 h-2.5 rounded-full bg-text-subtle"></span>
+              <span id="chatEngineStatusText" class="text-text-muted font-bold">Idle</span>
+            </div>
+          </div>
+
+          <!-- Controls Form -->
+          <form id="chatEngineForm" onsubmit="startChatEngine(event)" class="space-y-3 pt-1">
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+              <div class="relative sm:col-span-2">
+                <span class="material-symbols-outlined text-text-subtle absolute left-3.5 top-3 text-[18px]">stream</span>
+                <input type="text" id="chatStreamTarget" placeholder="Twitch channel (e.g. shroud) or YouTube live video URL" required class="w-full bg-surface text-white text-xs sm:text-sm font-mono rounded-xl border border-border pl-10 pr-4 py-2.5 focus:ring-1 focus:ring-secondary">
+              </div>
+              <div class="flex items-center gap-2">
+                <select id="chatSourceType" class="bg-surface text-white text-xs font-mono rounded-xl border border-border px-3 py-2.5 flex-1">
+                  <option value="twitch">Twitch IRC</option>
+                  <option value="youtube">YouTube Live</option>
+                  <option value="simulated">Simulated Demo</option>
+                </select>
+                <select id="chatSensitivity" class="bg-surface text-white text-xs font-mono rounded-xl border border-border px-3 py-2.5 flex-1">
+                  <option value="medium" selected>Medium Sensitivity</option>
+                  <option value="high">High Sensitivity</option>
+                  <option value="low">Low Sensitivity</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="flex flex-wrap items-center justify-between gap-3 pt-1">
+              <div class="flex items-center gap-2">
+                <button type="submit" id="btnStartChatEngine" class="bg-gradient-to-r from-red-600 to-pink-600 hover:brightness-110 text-white font-headline text-xs font-bold px-5 py-2.5 rounded-xl shadow-lg transition-all active:scale-95 flex items-center gap-2">
+                  <span class="material-symbols-outlined text-[17px]">play_arrow</span>
+                  <span>Start Monitoring</span>
+                </button>
+                <button type="button" id="btnStopChatEngine" onclick="stopChatEngine()" class="hidden bg-surface-card hover:bg-surface-high text-white font-headline text-xs font-semibold px-4 py-2.5 rounded-xl border border-border transition-colors flex items-center gap-1.5">
+                  <span class="material-symbols-outlined text-[17px] text-red-400">stop</span>
+                  <span>Stop</span>
+                </button>
+              </div>
+              <button type="button" onclick="simulateChatHype()" class="bg-secondary/15 hover:bg-secondary/25 text-secondary border border-secondary/30 font-headline text-xs font-bold px-4 py-2 rounded-xl transition-all flex items-center gap-1.5">
+                <span class="material-symbols-outlined text-[16px]">bolt</span>
+                <span>Run 1-Click Simulation Demo</span>
+              </button>
+            </div>
+          </form>
+        </div>
+      </section>
+
+      <!-- Real-Time Activity Telemetry Gauges -->
+      <section class="grid grid-cols-2 sm:grid-cols-4 gap-4">
+        <div class="bg-surface-low border border-border rounded-2xl p-4 space-y-1">
+          <div class="text-[10px] uppercase font-mono text-text-subtle font-bold">Current Velocity</div>
+          <div class="flex items-baseline gap-1.5">
+            <span id="metricCurrentMps" class="font-headline text-2xl font-extrabold text-white">0.0</span>
+            <span class="text-xs font-mono text-text-muted">msgs/sec</span>
+          </div>
+          <div class="w-full bg-surface-card h-1.5 rounded-full overflow-hidden mt-1">
+            <div id="barCurrentMps" class="bg-secondary h-full rounded-full transition-all duration-300" style="width: 0%"></div>
+          </div>
+        </div>
+
+        <div class="bg-surface-low border border-border rounded-2xl p-4 space-y-1">
+          <div class="text-[10px] uppercase font-mono text-text-subtle font-bold">Activity Baseline</div>
+          <div class="flex items-baseline gap-1.5">
+            <span id="metricBaselineMps" class="font-headline text-2xl font-extrabold text-tertiary">0.5</span>
+            <span class="text-xs font-mono text-text-muted">rolling avg</span>
+          </div>
+          <div class="text-[10px] font-mono text-text-subtle">Adaptive 120s window</div>
+        </div>
+
+        <div class="bg-surface-low border border-border rounded-2xl p-4 space-y-1">
+          <div class="text-[10px] uppercase font-mono text-text-subtle font-bold">Spikes Detected</div>
+          <div class="flex items-baseline gap-1.5">
+            <span id="metricTotalSpikes" class="font-headline text-2xl font-extrabold text-primary">0</span>
+            <span class="text-xs font-mono text-text-muted">highlights</span>
+          </div>
+          <div class="text-[10px] font-mono text-text-subtle">Coalesced & clip-ready</div>
+        </div>
+
+        <div class="bg-surface-low border border-border rounded-2xl p-4 space-y-1">
+          <div class="text-[10px] uppercase font-mono text-text-subtle font-bold">Total Messages</div>
+          <div class="flex items-baseline gap-1.5">
+            <span id="metricTotalMsgs" class="font-headline text-2xl font-extrabold text-white">0</span>
+            <span class="text-xs font-mono text-text-muted">processed</span>
+          </div>
+          <div class="text-[10px] font-mono text-text-subtle">Anti-spam filtered</div>
+        </div>
+      </section>
+
+      <!-- Detected Hype Moments & Clips Feed -->
+      <section class="space-y-3">
+        <div class="flex items-center justify-between">
+          <h3 class="font-headline text-sm sm:text-base font-bold text-white flex items-center gap-2">
+            <span class="material-symbols-outlined text-red-500 text-[20px]">local_fire_department</span>
+            <span>Detected Chat Highlights & Hype Clips</span>
+          </h3>
+          <button onclick="refreshChatSpikes()" class="text-xs font-headline text-secondary hover:underline flex items-center gap-1">
+            <span class="material-symbols-outlined text-[15px]">refresh</span>
+            <span>Refresh</span>
+          </button>
+        </div>
+
+        <div id="chatSpikesContainer" class="space-y-3">
+          <div class="p-8 text-center bg-surface-low border border-dashed border-border rounded-2xl text-text-muted text-xs">
+            No chat spikes detected yet. Start live monitoring or click "Run 1-Click Simulation Demo" above to watch the engine detect hype moments in real-time.
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <!-- ========================================================================= -->
+    <!-- TAB 6: TREND HUNTER & AUTOMATIC VIRAL CLIP EXTRACTION                     -->
+    <!-- ========================================================================= -->
+    <div id="tab-trend-hunter" class="tab-content hidden space-y-6">
+
+      <!-- Header & Global Telemetry Stats -->
+      <section class="bg-gradient-to-r from-amber-500/10 via-surface to-red-500/10 border border-amber-500/20 rounded-3xl p-5 sm:p-7 relative overflow-hidden">
+        <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-6 relative z-10">
+          <div class="space-y-2 max-w-2xl">
+            <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-amber-500/15 border border-amber-500/30 text-amber-300 font-mono text-[11px] font-bold">
+              <span class="w-2 h-2 rounded-full bg-amber-400 animate-pulse"></span>
+              <span>AUTONOMOUS TREND HUNTER ENGINE</span>
+            </div>
+            <h2 class="font-headline text-2xl sm:text-3xl font-extrabold text-white tracking-tight">
+              Trend Hunter & Viral Stream Snatcher
+            </h2>
+            <p class="text-xs sm:text-sm text-text-muted leading-relaxed">
+              Discovers high-demand YouTube & Twitch channels, monitors rolling live buffers, fuses multi-modal signals (Chat MPS + Audio Loudness + Viewers), and extracts Shorts-ready 9:16 clips autonomously with Faster-Whisper & Opus kinetic subtitles.
+            </p>
+          </div>
+
+          <!-- Automation Level & Quick Test Simulation Button -->
+          <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+            <div class="flex items-center gap-1.5 bg-surface/80 border border-border px-3 py-2.5 rounded-2xl text-xs">
+              <span class="text-text-subtle font-headline font-semibold">Workflow:</span>
+              <select id="thAutomationLevelSelect" onchange="changeAutomationLevel(this.value)" class="bg-transparent text-amber-300 font-bold focus:outline-none cursor-pointer">
+                <option value="MANUAL" class="bg-surface text-white">Manual Review</option>
+                <option value="SEMI_AUTO" class="bg-surface text-white">Semi-Auto (Auto QC)</option>
+                <option value="FULL_AUTO" class="bg-surface text-white">Fully Autonomous</option>
+              </select>
+            </div>
+
+            <button onclick="runTrendHunterSimulation()" class="px-5 py-3 rounded-2xl bg-gradient-to-r from-amber-500 to-red-600 hover:brightness-110 text-white font-headline text-xs font-bold shadow-lg transition-all flex items-center justify-center gap-2">
+              <span class="material-symbols-outlined text-[18px]">play_circle</span>
+              <span>1-Click Test Hype Stream (IShowSpeed)</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Telemetry Counters Grid -->
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mt-6 pt-6 border-t border-border/60">
+          <div class="bg-surface-low/80 p-3.5 rounded-2xl border border-border">
+            <div class="text-[10px] font-mono text-text-subtle uppercase tracking-wider">Active Monitored Streams</div>
+            <div id="thMetricMonitoredStreams" class="text-xl sm:text-2xl font-headline font-black text-amber-400 mt-1">0</div>
+          </div>
+          <div class="bg-surface-low/80 p-3.5 rounded-2xl border border-border">
+            <div class="text-[10px] font-mono text-text-subtle uppercase tracking-wider">Tracked Channels</div>
+            <div id="thMetricTrackedChannels" class="text-xl sm:text-2xl font-headline font-black text-white mt-1">0</div>
+          </div>
+          <div class="bg-surface-low/80 p-3.5 rounded-2xl border border-border">
+            <div class="text-[10px] font-mono text-text-subtle uppercase tracking-wider">Peak Demand Score</div>
+            <div id="thMetricHighestDemand" class="text-xl sm:text-2xl font-headline font-black text-tertiary mt-1">--</div>
+          </div>
+          <div class="bg-surface-low/80 p-3.5 rounded-2xl border border-border">
+            <div class="text-[10px] font-mono text-text-subtle uppercase tracking-wider">Extracted Viral Clips</div>
+            <div id="thMetricClipsExtracted" class="text-xl sm:text-2xl font-headline font-black text-secondary mt-1">0</div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Channel Discovery & Search Bar -->
+      <section class="bg-surface-low border border-border rounded-3xl p-5 sm:p-6 space-y-4">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-border/60 pb-3">
+          <div class="space-y-0.5">
+            <h3 class="font-headline text-base sm:text-lg font-bold text-white flex items-center gap-2">
+              <span class="material-symbols-outlined text-amber-400 text-[20px]">explore</span>
+              <span>Channel Discovery & Demand Radar</span>
+            </h3>
+            <p class="text-xs text-text-muted">Enter any creator name (e.g. "IShowSpeed"), @handle, or Twitch/YouTube stream URL.</p>
+          </div>
+        </div>
+
+        <div class="flex flex-col md:flex-row items-stretch gap-3">
+          <div class="relative flex-1">
+            <span class="material-symbols-outlined absolute left-3.5 top-3.5 text-text-subtle text-[18px]">search</span>
+            <input id="thSearchInput" type="text" placeholder="Search channel name, @handle, or live URL (e.g. IShowSpeed, KaiCenat, tarik)..."
+              class="w-full bg-surface border border-border focus:border-amber-400 pl-10 pr-4 py-3 rounded-2xl text-xs sm:text-sm text-white placeholder-text-subtle focus:outline-none transition-colors"
+              onkeydown="if(event.key==='Enter') searchOrAddChannel()" />
+          </div>
+
+          <div class="flex items-center gap-2">
+            <select id="thPlatformSelect" class="bg-surface border border-border rounded-2xl px-3 py-3 text-xs font-headline font-medium text-white focus:outline-none focus:border-amber-400">
+              <option value="all">All Platforms</option>
+              <option value="youtube">YouTube</option>
+              <option value="twitch">Twitch</option>
+            </select>
+
+            <select id="thSensitivitySelect" class="bg-surface border border-border rounded-2xl px-3 py-3 text-xs font-headline font-medium text-white focus:outline-none focus:border-amber-400">
+              <option value="medium">Medium (2.2σ)</option>
+              <option value="high">High (1.6σ More Clips)</option>
+              <option value="low">Low (3.0σ Mega Hypes)</option>
+            </select>
+
+            <button onclick="searchOrAddChannel()" class="px-5 py-3 rounded-2xl bg-amber-500 hover:bg-amber-400 text-black font-headline text-xs font-bold shadow-md transition-all flex items-center gap-1.5 whitespace-nowrap">
+              <span class="material-symbols-outlined text-[17px]">radar</span>
+              <span>Discover & Track</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Quick Trending Preset Chips -->
+        <div class="flex items-center gap-2 flex-wrap pt-1 text-xs">
+          <span class="text-text-subtle font-medium">Trending Live Seeds:</span>
+          <button onclick="quickAddChannel('IShowSpeed', 'youtube')" class="px-3 py-1 rounded-full bg-surface border border-border hover:border-red-500/50 text-text-muted hover:text-white font-mono text-[11px] transition-colors flex items-center gap-1">
+            <span class="w-1.5 h-1.5 rounded-full bg-red-500"></span>
+            <span>IShowSpeed (YouTube)</span>
+          </button>
+          <button onclick="quickAddChannel('kaicenat', 'twitch')" class="px-3 py-1 rounded-full bg-surface border border-border hover:border-purple-500/50 text-text-muted hover:text-white font-mono text-[11px] transition-colors flex items-center gap-1">
+            <span class="w-1.5 h-1.5 rounded-full bg-purple-500"></span>
+            <span>KaiCenat (Twitch)</span>
+          </button>
+          <button onclick="quickAddChannel('tarik', 'twitch')" class="px-3 py-1 rounded-full bg-surface border border-border hover:border-purple-500/50 text-text-muted hover:text-white font-mono text-[11px] transition-colors flex items-center gap-1">
+            <span class="w-1.5 h-1.5 rounded-full bg-purple-500"></span>
+            <span>tarik (Twitch)</span>
+          </button>
+          <button onclick="quickAddChannel('xqc', 'twitch')" class="px-3 py-1 rounded-full bg-surface border border-border hover:border-purple-500/50 text-text-muted hover:text-white font-mono text-[11px] transition-colors flex items-center gap-1">
+            <span class="w-1.5 h-1.5 rounded-full bg-purple-500"></span>
+            <span>xQc (Twitch)</span>
+          </button>
+          <button onclick="quickAddChannel('LofiGirl', 'youtube')" class="px-3 py-1 rounded-full bg-surface border border-border hover:border-red-500/50 text-text-muted hover:text-white font-mono text-[11px] transition-colors flex items-center gap-1">
+            <span class="w-1.5 h-1.5 rounded-full bg-red-500"></span>
+            <span>Lofi Girl (YouTube)</span>
+          </button>
+        </div>
+      </section>
+
+      <!-- Active Stream Live Monitor Cockpit (Real-time telemetry) -->
+      <section id="thActiveCockpit" class="hidden bg-surface-low border border-amber-500/30 rounded-3xl p-5 sm:p-6 space-y-4">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-border/60 pb-3">
+          <div class="flex items-center gap-3">
+            <span class="w-3 h-3 rounded-full bg-red-500 animate-ping"></span>
+            <div>
+              <div class="flex items-center gap-2">
+                <h3 id="thActiveChannelTitle" class="font-headline text-base sm:text-lg font-bold text-white">Live Monitoring Stream</h3>
+                <span class="font-mono text-[10px] px-2 py-0.5 rounded-full bg-red-600/20 text-red-400 border border-red-500/30 font-bold uppercase">RECORDING 5M BUFFER</span>
+              </div>
+              <p id="thActiveStreamUrl" class="text-xs text-text-muted font-mono truncate max-w-md">https://...</p>
+            </div>
+          </div>
+          <button onclick="stopActiveMonitoring()" class="px-4 py-2 rounded-xl bg-surface-card hover:bg-surface border border-red-500/40 text-red-400 hover:text-red-300 font-headline text-xs font-semibold transition-colors flex items-center gap-1">
+            <span class="material-symbols-outlined text-[16px]">stop_circle</span>
+            <span>Stop Monitoring</span>
+          </button>
+        </div>
+
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-3 text-xs font-mono">
+          <div class="bg-surface p-3 rounded-2xl border border-border space-y-1">
+            <div class="text-[10px] text-text-subtle">Rolling Buffer Stored</div>
+            <div id="thBufferDuration" class="text-base font-bold text-tertiary">0.0s / 300s</div>
+            <div class="text-[9px] text-text-subtle font-sans">Pre-roll 20s preserved</div>
+          </div>
+          <div class="bg-surface p-3 rounded-2xl border border-border space-y-1">
+            <div class="text-[10px] text-text-subtle">Live Chat Rate</div>
+            <div id="thLiveMps" class="text-base font-bold text-red-400">0.0 MPS</div>
+            <div class="w-full bg-surface-high h-1.5 rounded-full overflow-hidden mt-1">
+              <div id="thMpsBar" class="bg-red-500 h-full w-0 transition-all duration-300"></div>
+            </div>
+          </div>
+          <div class="bg-surface p-3 rounded-2xl border border-border space-y-1">
+            <div class="text-[10px] text-text-subtle">Audio Level & Surge</div>
+            <div id="thAudioLevel" class="text-base font-bold text-secondary">-40.0 dB</div>
+            <div class="text-[9px] text-text-subtle font-sans">Detects yelling / hypes</div>
+          </div>
+          <div class="bg-surface p-3 rounded-2xl border border-border space-y-1">
+            <div class="text-[10px] text-text-subtle">Live Demand Score</div>
+            <div id="thDemandScore" class="text-base font-bold text-amber-400">0/100</div>
+            <div class="text-[9px] text-text-subtle font-sans">Multi-signal fused</div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Discovered & Tracked Channels Grid -->
+      <section class="space-y-4">
+        <div class="flex items-center justify-between">
+          <div class="flex items-center gap-2">
+            <span class="material-symbols-outlined text-secondary text-[20px]">view_list</span>
+            <h3 class="font-headline text-base sm:text-lg font-bold text-white">Tracked & Discovered Channels</h3>
+          </div>
+          <button onclick="loadTrendHunterData()" class="text-xs font-headline text-secondary hover:underline flex items-center gap-1">
+            <span class="material-symbols-outlined text-[15px]">refresh</span>
+            <span>Refresh Live Status</span>
+          </button>
+        </div>
+
+        <div id="thChannelsContainer" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          <div class="p-8 text-center bg-surface-low border border-dashed border-border rounded-2xl text-text-muted text-xs col-span-full">
+            Loading tracked channels...
+          </div>
+        </div>
+      </section>
+
+      <!-- Viral Shorts Review & Safe Publishing Queue -->
+      <section class="space-y-4 pt-2">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-border/60 pb-3">
+          <div class="space-y-0.5">
+            <div class="flex items-center gap-2">
+              <span class="material-symbols-outlined text-red-500 text-[22px]">video_camera_front</span>
+              <h3 class="font-headline text-base sm:text-lg font-bold text-white">Viral Shorts Review & Publishing Queue</h3>
+              <span id="thReviewQueueBadge" class="font-mono text-[10px] px-2 py-0.5 rounded-full bg-secondary/20 text-secondary border border-secondary/30 font-bold">0 Pending</span>
+            </div>
+            <p class="text-xs text-text-muted">High-energy moments extracted from rolling buffer, formatted into 9:16 Shorts with subtitles. Review and publish with 1 click.</p>
+          </div>
+
+          <!-- Sync & Filter buttons -->
+          <div class="flex items-center gap-2 flex-wrap">
+            <button onclick="syncYouTubeAnalytics()" class="px-3 py-1.5 rounded-xl bg-surface hover:bg-surface-high border border-border hover:border-secondary text-secondary hover:text-white font-headline text-xs flex items-center gap-1 transition-colors" title="Sync live view & like counts from YouTube to train adaptive AI weights">
+              <span class="material-symbols-outlined text-[16px]">sync</span>
+              <span>Sync Analytics</span>
+            </button>
+            <div class="flex items-center gap-1.5 bg-surface p-1 rounded-xl border border-border text-xs font-headline">
+              <button onclick="filterReviewQueue('ALL')" class="th-filter-btn px-3 py-1 rounded-lg bg-surface-high text-white font-semibold">All</button>
+              <button onclick="filterReviewQueue('PENDING_REVIEW')" class="th-filter-btn px-3 py-1 rounded-lg text-text-muted hover:text-white">Pending</button>
+              <button onclick="filterReviewQueue('PRE_APPROVED')" class="th-filter-btn px-3 py-1 rounded-lg text-text-muted hover:text-white">Pre-Approved</button>
+              <button onclick="filterReviewQueue('PUBLISHED')" class="th-filter-btn px-3 py-1 rounded-lg text-text-muted hover:text-white">Published</button>
+            </div>
+          </div>
+        </div>
+
+        <div id="thReviewQueueContainer" class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          <div class="p-8 text-center bg-surface-low border border-dashed border-border rounded-2xl text-text-muted text-xs col-span-full">
+            No viral clips extracted yet. Channels monitored in live mode will automatically extract moments here once confidence thresholds are reached.
+          </div>
+        </div>
+      </section>
+
+    </div>
+  </main>
+
+  <!-- ========================================================================= -->
+  <!-- 3. PERSISTENT FLOATING APPROVAL BAR                                       -->
+  <!-- ========================================================================= -->
+  <aside id="floatingApprovalBar" class="hidden md:flex fixed bottom-6 right-8 z-30 bg-surface-low/95 backdrop-blur-xl border border-secondary/40 shadow-2xl rounded-2xl px-5 py-3 items-center gap-3 transition-transform duration-300">
+    <div class="flex items-center justify-between w-full sm:w-auto gap-3">
+      <div class="flex items-center gap-2">
+        <span class="w-2.5 h-2.5 rounded-full bg-secondary animate-pulse"></span>
+        <span id="floatingApprovedCount" class="font-headline text-xs sm:text-sm font-bold text-white">2 of 9 Approved</span>
+      </div>
+      <span class="font-mono text-[10px] text-secondary bg-secondary/10 px-2 py-0.5 rounded-full border border-secondary/30">
+        Review Active
+      </span>
+    </div>
+
+    <div class="flex items-center justify-end w-full sm:w-auto gap-2">
+      <button id="floatingExportZipBtn" class="flex items-center gap-1 px-3 py-1.5 rounded-xl bg-surface-card hover:bg-surface-high border border-border text-xs font-headline font-semibold text-white transition-colors">
+        <span class="material-symbols-outlined text-[15px]">archive</span>
+        <span>ZIP</span>
+      </button>
+
+      <button id="floatingCommitBtn" class="flex items-center gap-1.5 px-4 py-1.5 rounded-xl bg-gradient-to-r from-primary to-secondary hover:brightness-110 text-white font-headline text-xs font-bold shadow-md transition-all">
+        <span class="material-symbols-outlined text-[16px]">publish</span>
+        <span>Approve & Schedule</span>
+      </button>
+    </div>
+  </aside>
+
+  <!-- ========================================================================= -->
+  <!-- 4. MOBILE BOTTOM NAVIGATION (Native-like bottom bar on phones)             -->
+  <!-- ========================================================================= -->
+  <nav class="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-surface-low/95 backdrop-blur-xl border-t border-border flex items-center justify-around py-2 px-1 shadow-2xl">
+    <button onclick="switchTab('tab-studio')" class="mobile-nav-btn flex flex-col items-center py-1 px-3 text-secondary transition-colors" data-mobtab="tab-studio">
+      <span class="material-symbols-outlined text-[20px]">movie_edit</span>
+      <span class="text-[10px] font-headline font-semibold mt-0.5">Studio</span>
+    </button>
+    <button onclick="switchTab('tab-batches')" class="mobile-nav-btn flex flex-col items-center py-1 px-3 text-text-muted hover:text-white transition-colors" data-mobtab="tab-batches">
+      <span class="material-symbols-outlined text-[20px]">video_library</span>
+      <span class="text-[10px] font-headline font-medium mt-0.5">Projects</span>
+    </button>
+    <button onclick="switchTab('tab-schedule')" class="mobile-nav-btn flex flex-col items-center py-1 px-2 text-text-muted hover:text-white transition-colors" data-mobtab="tab-schedule">
+      <span class="material-symbols-outlined text-[20px]">calendar_month</span>
+      <span class="text-[10px] font-headline font-medium mt-0.5">Schedule</span>
+    </button>
+    <button onclick="switchTab('tab-chat')" class="mobile-nav-btn flex flex-col items-center py-1 px-2 text-text-muted hover:text-white transition-colors" data-mobtab="tab-chat">
+      <span class="material-symbols-outlined text-[20px]">forum</span>
+      <span class="text-[10px] font-headline font-medium mt-0.5">Chat Spikes</span>
+    </button>
+    <button onclick="switchTab('tab-trend-hunter')" class="mobile-nav-btn flex flex-col items-center py-1 px-2 text-text-muted hover:text-white transition-colors" data-mobtab="tab-trend-hunter">
+      <span class="material-symbols-outlined text-[20px] text-amber-400">radar</span>
+      <span class="text-[10px] font-headline font-medium mt-0.5">Trend Hunter</span>
+    </button>
+    <button onclick="switchTab('tab-settings')" class="mobile-nav-btn flex flex-col items-center py-1 px-2 text-text-muted hover:text-white transition-colors" data-mobtab="tab-settings">
+      <span class="material-symbols-outlined text-[20px]">settings</span>
+      <span class="text-[10px] font-headline font-medium mt-0.5">Settings</span>
+    </button>
+  </nav>
+
+  <!-- ========================================================================= -->
+  <!-- 5. MODALS (Mobile QR & New Project)                                       -->
+  <!-- ========================================================================= -->
+  <!-- Mobile Pairing Modal (Preserves test assertion id) -->
+  <div id="modalMobilePairing" class="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm hidden flex items-center justify-center p-4">
+    <div class="bg-surface-low border border-border rounded-2xl p-5 max-w-sm w-full space-y-4 shadow-2xl relative">
+      <button onclick="closeMobileModal()" class="absolute top-4 right-4 text-text-subtle hover:text-white">
+        <span class="material-symbols-outlined">close</span>
+      </button>
+      <div class="text-center space-y-1">
+        <h3 class="font-headline text-base sm:text-lg font-bold text-white">Connect Mobile Device</h3>
+        <p class="text-xs text-text-muted">Scan with your phone camera on the same Wi-Fi network.</p>
+      </div>
+      <div class="bg-white p-3.5 rounded-xl mx-auto w-44 h-44 flex items-center justify-center shadow-lg">
+        <div id="modalQrCode"></div>
+      </div>
+      <div class="text-center">
+        <span class="font-mono text-xs text-secondary bg-surface px-3 py-1 rounded-full border border-border" id="modalHostUrl">http://...</span>
+      </div>
+      <p class="text-[10px] text-text-subtle text-center">Windows Firewall Inbound Rule active on Port 8765.</p>
+    </div>
+  </div>
+
+  <!-- New Project Modal -->
+  <div id="newBatchModal" class="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm hidden flex items-center justify-center p-4">
+    <div class="bg-surface-low border border-border rounded-2xl p-5 sm:p-6 max-w-md w-full space-y-4 shadow-2xl relative">
+      <button onclick="closeNewBatchModal()" class="absolute top-4 right-4 text-text-subtle hover:text-white">
+        <span class="material-symbols-outlined">close</span>
+      </button>
+      <div class="space-y-1">
+        <h3 class="font-headline text-base sm:text-lg font-bold text-white">Create New Video Project</h3>
+        <p class="text-xs text-text-muted">Generates 9 target clips (6 Shorts + 3 Long form) across a 3-day release schedule.</p>
+      </div>
+      <form id="createBatchForm" class="space-y-3 pt-2">
+        <div>
+          <label class="block text-xs font-headline text-text-muted mb-1">Project Name</label>
+          <input type="text" name="name" value="Apex Champions High Energy Highlights" required class="w-full bg-surface-card text-white text-xs rounded-xl border border-border px-3.5 py-2.5">
+        </div>
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block text-xs font-headline text-text-muted mb-1">Target Days</label>
+            <input type="number" name="target_days" value="3" min="1" max="7" class="w-full bg-surface-card text-white text-xs font-mono rounded-xl border border-border px-3.5 py-2">
+          </div>
+          <div>
+            <label class="block text-xs font-headline text-text-muted mb-1">Videos / Day</label>
+            <input type="number" name="target_videos_per_day" value="3" min="1" max="10" class="w-full bg-surface-card text-white text-xs font-mono rounded-xl border border-border px-3.5 py-2">
+          </div>
+        </div>
+        <div>
+          <label class="block text-xs font-headline text-text-muted mb-1">Timezone</label>
+          <input type="text" name="schedule_timezone" value="Asia/Kolkata" class="w-full bg-surface-card text-white text-xs font-mono rounded-xl border border-border px-3.5 py-2">
+        </div>
+        <button type="submit" class="w-full bg-gradient-to-r from-primary to-secondary hover:brightness-110 text-white font-headline text-xs font-bold py-3 rounded-xl shadow-md transition-all mt-2">
+          Create Project
+        </button>
+      </form>
+    </div>
+  </div>
+
+  <!-- YouTube Connection Modal (Works for PC & Mobile) -->
+  <div id="modalYouTubeConnect" class="fixed inset-0 z-50 bg-black/85 backdrop-blur-md hidden flex items-center justify-center p-4">
+    <div class="bg-surface-low border border-red-500/40 rounded-2xl p-5 sm:p-6 max-w-md w-full space-y-4 shadow-2xl relative">
+      <button onclick="closeYouTubeModal()" class="absolute top-4 right-4 text-text-subtle hover:text-white p-1 rounded-lg">
+        <span class="material-symbols-outlined">close</span>
+      </button>
+
+      <div class="flex items-center gap-3">
+        <div class="w-10 h-10 rounded-xl bg-red-600/20 border border-red-500/30 flex items-center justify-center">
+          <span class="material-symbols-outlined text-red-500 text-[24px]">smart_display</span>
+        </div>
+        <div>
+          <h3 class="font-headline text-base sm:text-lg font-bold text-white">Connect YouTube Channel</h3>
+          <p class="text-xs text-text-muted">Authorize AutoClip to upload & schedule your viral clips.</p>
+        </div>
+      </div>
+
+      <!-- State: Disconnected -->
+      <div id="ytModalDisconnected" class="space-y-4 pt-1">
+        <div class="bg-surface p-3.5 rounded-xl border border-border space-y-2 text-xs text-text-muted">
+          <div class="font-headline font-semibold text-white flex items-center gap-1.5">
+            <span class="material-symbols-outlined text-secondary text-[16px]">info</span>
+            <span>How Connection Works:</span>
+          </div>
+          <ol class="list-decimal pl-4 space-y-1 text-text-subtle text-[11px] leading-relaxed">
+            <li>Click <b>Sign In with Google</b> below to open Google's consent screen.</li>
+            <li>Select your Google / YouTube account and tap <b>Allow / Continue</b>.</li>
+            <li>If on PC desktop, authorization finishes automatically!</li>
+            <li>If on phone or redirected to localhost refused: copy the URL from your phone browser address bar and paste it below.</li>
+          </ol>
+        </div>
+
+        <button id="btnOpenGoogleAuth" onclick="openGoogleOAuthWindow()" class="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-red-600 to-rose-600 hover:brightness-110 text-white font-headline text-xs font-bold py-3 rounded-xl shadow-lg transition-all active:scale-95">
+          <span class="material-symbols-outlined text-[18px]">key</span>
+          <span>1. Sign In with Google</span>
+        </button>
+
+        <div class="relative flex py-1 items-center">
+          <div class="flex-grow border-t border-border"></div>
+          <span class="flex-shrink mx-3 text-text-subtle text-[10px] uppercase font-mono">Mobile / Paste Code</span>
+          <div class="flex-grow border-t border-border"></div>
+        </div>
+
+        <form id="formExchangeYtCode" onsubmit="submitOAuthCode(event)" class="space-y-2">
+          <label class="block text-[11px] font-headline text-text-muted">2. Paste Redirect URL or Code</label>
+          <div class="flex items-center gap-2">
+            <input type="text" id="inputYtOAuthCode" placeholder="http://127.0.0.1:8088/?code=4/0A... or code string" class="flex-1 bg-surface-card text-white text-xs font-mono rounded-xl border border-border px-3 py-2.5 focus:ring-1 focus:ring-secondary">
+            <button type="submit" class="bg-secondary hover:bg-secondary-glow text-surface font-headline text-xs font-bold px-4 py-2.5 rounded-xl transition-all whitespace-nowrap">
+              Connect
+            </button>
+          </div>
+        </form>
+      </div>
+
+      <!-- State: Connected -->
+      <div id="ytModalConnected" class="hidden space-y-4 pt-1 text-center">
+        <div class="w-16 h-16 rounded-full bg-tertiary/20 border-2 border-tertiary mx-auto flex items-center justify-center shadow-[0_0_20px_rgba(16,185,129,0.3)]">
+          <span class="material-symbols-outlined text-tertiary text-[32px]">check</span>
+        </div>
+        <div>
+          <h4 id="ytModalChannelName" class="font-headline text-base font-bold text-white">Channel Connected</h4>
+          <p class="text-xs text-tertiary mt-0.5">Ready for instant & scheduled YouTube uploads</p>
+        </div>
+        <div class="pt-2 flex items-center gap-2 justify-center">
+          <button onclick="closeYouTubeModal()" class="bg-surface-card hover:bg-surface-high border border-border text-white text-xs font-headline font-semibold px-4 py-2 rounded-xl transition-colors">
+            Done
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast Notification -->
+  <div id="toast" class="fixed top-5 right-5 z-50 bg-surface-card border border-border text-white text-xs font-headline px-3.5 py-2.5 rounded-xl shadow-2xl transition-all transform translate-y-[-100px] opacity-0 flex items-center gap-2">
+    <span id="toastIcon" class="material-symbols-outlined text-[16px] text-tertiary">check_circle</span>
+    <span id="toastMsg">Notification</span>
+  </div>
+
+  <!-- ========================================================================= -->
+  <!-- 6. APPLICATION JAVASCRIPT LOGIC                                           -->
+  <!-- ========================================================================= -->
+  <script>
+    let currentBatchId = null;
+    let currentClips = [];
+    let currentClipFilter = 'all';
+    let serverHost = '192.168.1.9:8765';
+
+    // Toast Utility
+    function showToast(msg, type = 'success') {
+      const t = document.getElementById('toast');
+      const icon = document.getElementById('toastIcon');
+      const text = document.getElementById('toastMsg');
+      text.textContent = msg;
+      if (type === 'error') {
+        icon.textContent = 'error';
+        icon.className = 'material-symbols-outlined text-[16px] text-error';
+      } else {
+        icon.textContent = 'check_circle';
+        icon.className = 'material-symbols-outlined text-[16px] text-tertiary';
+      }
+      t.classList.remove('translate-y-[-100px]', 'opacity-0');
+      setTimeout(() => {
+        t.classList.add('translate-y-[-100px]', 'opacity-0');
+      }, 3500);
+    }
+
+    // Tab Navigation
+    function switchTab(tabId) {
+      document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
+      const activeTab = document.getElementById(tabId);
+      if (activeTab) activeTab.classList.remove('hidden');
+
+      // Update Desktop Nav Buttons
+      document.querySelectorAll('.nav-btn').forEach(btn => {
+        if (btn.dataset.tab === tabId) {
+          btn.className = 'nav-btn flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-secondary bg-surface-high font-headline text-xs font-semibold shadow-sm transition-all';
+        } else {
+          btn.className = 'nav-btn flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-text-muted hover:text-white font-headline text-xs font-medium transition-colors';
+        }
+      });
+
+      // Update Mobile Nav Buttons
+      document.querySelectorAll('.mobile-nav-btn').forEach(btn => {
+        if (btn.dataset.mobtab === tabId) {
+          btn.classList.add('text-secondary');
+          btn.classList.remove('text-text-muted');
+        } else {
+          btn.classList.remove('text-secondary');
+          btn.classList.add('text-text-muted');
+        }
+      });
+
+      if (tabId === 'tab-settings') refreshServerLogs();
+      if (tabId === 'tab-trend-hunter') {
+        loadTrendHunterData();
+        startTrendHunterPolling();
+      }
+    }
+
+    document.querySelectorAll('.nav-btn').forEach(btn => {
+      btn.addEventListener('click', () => switchTab(btn.dataset.tab));
+    });
+
+    // Paste from clipboard helper
+    async function pasteFromClipboard() {
+      try {
+        const text = await navigator.clipboard.readText();
+        if (text) document.getElementById('sourceUrlInput').value = text;
+      } catch (err) {
+        showToast('Please paste manually using Ctrl+V', 'info');
+      }
+    }
+
+    // YouTube Modal & OAuth Management
+    let ytPollTimer = null;
+
+    function openYouTubeModal() {
+      document.getElementById('modalYouTubeConnect').classList.remove('hidden');
+      checkModalYoutubeStatus();
+      if (ytPollTimer) clearInterval(ytPollTimer);
+      ytPollTimer = setInterval(checkModalYoutubeStatus, 2500);
+    }
+
+    function closeYouTubeModal() {
+      document.getElementById('modalYouTubeConnect').classList.add('hidden');
+      if (ytPollTimer) {
+        clearInterval(ytPollTimer);
+        ytPollTimer = null;
+      }
+      checkYoutubeStatus();
+    }
+
+    async function checkModalYoutubeStatus() {
+      try {
+        const res = await fetch('/api/youtube/status');
+        const data = await res.json();
+        const dis = document.getElementById('ytModalDisconnected');
+        const con = document.getElementById('ytModalConnected');
+        const chan = document.getElementById('ytModalChannelName');
+
+        if (data.connected) {
+          if (dis) dis.classList.add('hidden');
+          if (con) con.classList.remove('hidden');
+          if (chan) chan.textContent = data.channel_title || 'YouTube Channel Connected';
+          checkYoutubeStatus();
+        } else {
+          if (dis) dis.classList.remove('hidden');
+          if (con) con.classList.add('hidden');
+        }
+      } catch (e) {}
+    }
+
+    async function openGoogleOAuthWindow() {
+      showToast('Opening Google OAuth login…', 'info');
+      try {
+        const res = await fetch('/api/youtube/auth-url');
+        const data = await res.json();
+        if (data.auth_url) {
+          window.open(data.auth_url, '_blank');
+          showToast('Google sign-in opened. Click Allow and return here.');
+        } else {
+          showToast(data.message || 'Could not get OAuth link', 'error');
+        }
+      } catch (e) {
+        showToast('Error opening Google OAuth: ' + e.message, 'error');
+      }
+    }
+
+    async function submitOAuthCode(e) {
+      e.preventDefault();
+      const input = document.getElementById('inputYtOAuthCode');
+      const code = (input ? input.value : '').trim();
+      if (!code) return showToast('Please paste the redirect URL or code first', 'warning');
+
+      showToast('Connecting channel…', 'info');
+      try {
+        const res = await fetch('/api/youtube/connect', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ code: code })
+        });
+        const data = await res.json();
+        if (data.connected) {
+          showToast('🎉 YouTube channel successfully connected!', 'success');
+          checkModalYoutubeStatus();
+          checkYoutubeStatus();
+          setTimeout(closeYouTubeModal, 1500);
+        } else {
+          showToast(data.message || 'Connection failed. Verify code.', 'error');
+        }
+      } catch (err) {
+        showToast('Connection error: ' + err.message, 'error');
+      }
+    }
+
+    // YouTube Status Check
+    async function checkYoutubeStatus() {
+      try {
+        const res = await fetch('/api/youtube/status');
+        const data = await res.json();
+        const dot = document.getElementById('ytStatusDot');
+        const text = document.getElementById('ytStatusText');
+        const btn = document.getElementById('btnConnectYoutubeTop');
+        const details = document.getElementById('ytSettingsDetails');
+
+        if (data.connected) {
+          if (dot) dot.className = 'w-2 h-2 rounded-full bg-tertiary shadow-[0_0_8px_#10B981]';
+          const label = data.channel_title ? data.channel_title.slice(0, 14) : 'Connected';
+          if (text) text.textContent = label;
+          if (details) details.textContent = `Connected: ${data.channel_title || 'Channel Active'} (Ready for Uploads)`;
+          if (btn) {
+            btn.textContent = 'Linked ✓';
+            btn.onclick = (e) => { e.stopPropagation(); openYouTubeModal(); };
+          }
+        } else {
+          if (dot) dot.className = 'w-2 h-2 rounded-full bg-warning';
+          if (text) text.textContent = data.configured ? 'Not Linked' : 'No Secrets';
+          if (details) details.textContent = data.configured ? 'Google OAuth Configured • Ready to Connect' : 'OAuth secrets required in client_secrets.json';
+          if (btn) {
+            btn.textContent = 'Connect';
+            btn.onclick = (e) => { e.stopPropagation(); openYouTubeModal(); };
+          }
+        }
+      } catch (err) {
+        console.error(err);
+      }
+    }
+
+    // 1-Click Direct Publish Clip to YouTube
+    async function publishClipToYouTube(clipId) {
+      const statRes = await fetch('/api/youtube/status');
+      const stat = await statRes.json();
+      if (!stat.connected) {
+        showToast('Please connect your YouTube channel first', 'warning');
+        openYouTubeModal();
+        return;
+      }
+
+      showToast('🚀 Uploading clip to YouTube channel… Please wait…', 'info');
+      try {
+        const res = await fetch(`/api/clips/${clipId}/publish-youtube`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ privacy: 'public' })
+        });
+        const data = await res.json();
+        if (res.ok) {
+          showToast(`🎉 Live on YouTube! ${data.title || ''}`, 'success');
+          loadBatchClips(currentBatchId);
+        } else {
+          showToast(data.detail || 'YouTube upload failed', 'error');
+        }
+      } catch (err) {
+        showToast('Upload error: ' + err.message, 'error');
+      }
+    }
+
+    // Load Batches (Projects)
+    async function loadBatches() {
+      try {
+        const res = await fetch('/api/batches');
+        const data = await res.json();
+        const select = document.getElementById('batchSelectTop');
+        const badge = document.getElementById('navBatchesBadge');
+        const cardsCont = document.getElementById('batchCardsContainer');
+        select.innerHTML = '';
+        cardsCont.innerHTML = '';
+
+        const batches = data.batches || [];
+        badge.textContent = batches.length;
+
+        if (batches.length === 0) {
+          currentBatchId = null;
+          currentClips = [];
+          select.innerHTML = '<option value="">No Projects (Ready)</option>';
+          cardsCont.innerHTML = `
+            <div class="col-span-full py-14 text-center text-text-muted bg-surface-low border border-dashed border-border rounded-2xl">
+              <span class="material-symbols-outlined text-4xl text-text-subtle mb-2">folder_off</span>
+              <p class="font-headline font-bold text-white text-base">No video projects yet</p>
+              <p class="text-xs text-text-subtle mt-1 mb-4">Paste a video link or drop an MP4 file in the Studio above to start.</p>
+              <button onclick="openNewBatchModal()" class="px-5 py-2.5 bg-gradient-to-r from-primary to-secondary text-white text-xs rounded-xl font-bold shadow-md hover:brightness-110 transition-all">+ Create First Project</button>
+            </div>
+          `;
+          document.getElementById('activeBatchTitle').textContent = 'Ready for New Video';
+          document.getElementById('activeBatchStatusBadge').textContent = 'READY';
+          document.getElementById('activeBatchSubtitle').textContent = 'OpusClip-grade AI Virality Engine • Faster-Whisper Word Timestamps • 100% Review Gate';
+          document.getElementById('clipsGrid').innerHTML = `
+            <div class="col-span-full py-16 text-center text-text-muted bg-surface-low border border-dashed border-border rounded-2xl">
+              <span class="material-symbols-outlined text-4xl text-secondary mb-2">auto_videocam</span>
+              <p class="font-headline font-bold text-white text-base">Ready to Generate Viral Clips</p>
+              <p class="text-xs text-text-subtle mt-1">Paste any YouTube URL or click "upload MP4 file directly" above to create clips.</p>
+            </div>
+          `;
+          const floatingCount = document.getElementById('floatingApprovedCount');
+          if (floatingCount) floatingCount.textContent = '0 of 0 Approved';
+          renderJobs([]);
+          renderSchedules([]);
+          return;
+        }
+
+        batches.forEach((b, idx) => {
+          const opt = document.createElement('option');
+          opt.value = b.id;
+          opt.textContent = `${b.name} (${b.status})`;
+          if (!currentBatchId && idx === 0) opt.selected = true;
+          else if (currentBatchId === b.id) opt.selected = true;
+          select.appendChild(opt);
+
+          // Card in Projects Tab
+          const card = document.createElement('div');
+          card.className = `p-5 rounded-2xl border transition-all ${currentBatchId === b.id ? 'bg-surface-card border-secondary shadow-[0_0_20px_rgba(6,182,212,0.15)]' : 'bg-surface-low border-border hover:border-text-subtle'}`;
+          card.innerHTML = `
+            <div class="flex items-start justify-between gap-2">
+              <div class="cursor-pointer flex-1" onclick="selectBatch('${b.id}'); switchTab('tab-studio');">
+                <h4 class="font-headline font-bold text-white text-base line-clamp-1">${b.name}</h4>
+                <div class="flex items-center gap-2 mt-1 text-xs text-text-subtle font-mono">
+                  <span>${b.source_count || 1} Source</span>
+                  <span>•</span>
+                  <span>${b.schedule_days || 3} Days Target</span>
+                </div>
+              </div>
+              <div class="flex items-center gap-1.5">
+                <span class="font-mono text-[10px] px-2.5 py-0.5 rounded-full uppercase font-bold ${b.status === 'COMPLETED' ? 'bg-tertiary/20 text-tertiary border border-tertiary/30' : (b.status === 'AWAITING_APPROVAL' ? 'bg-secondary/20 text-secondary border border-secondary/30' : 'bg-surface-high text-text-muted border border-border')}">${b.status}</span>
+                <button onclick="deleteBatch('${b.id}', event)" class="p-1.5 rounded-lg text-text-subtle hover:text-error hover:bg-surface-high transition-colors" title="Delete Project">
+                  <span class="material-symbols-outlined text-[18px]">delete</span>
+                </button>
+              </div>
+            </div>
+            <div class="flex items-center justify-between text-xs text-text-muted mt-4 cursor-pointer" onclick="selectBatch('${b.id}'); switchTab('tab-studio');">
+              <span>Viral Clips Ready:</span>
+              <span class="font-mono font-bold text-white">${b.approved_count || 0} / 9 Approved</span>
+            </div>
+            <div class="w-full h-2 bg-surface-high rounded-full overflow-hidden mt-2 cursor-pointer" onclick="selectBatch('${b.id}'); switchTab('tab-studio');">
+              <div class="h-full bg-gradient-to-r from-secondary to-tertiary" style="width: ${Math.min(100, Math.max(10, ((b.approved_count || 0) / 9) * 100))}%;"></div>
+            </div>
+            <div class="mt-4 pt-3 border-t border-border/80 flex items-center justify-between">
+              <button onclick="selectBatch('${b.id}'); switchTab('tab-studio');" class="text-xs font-headline font-semibold text-secondary hover:text-white flex items-center gap-1">
+                <span>Open in Studio</span>
+                <span class="material-symbols-outlined text-[16px]">arrow_forward</span>
+              </button>
+            </div>
+          `;
+          cardsCont.appendChild(card);
+        });
+
+        if (!currentBatchId && batches.length > 0) {
+          selectBatch(batches[0].id);
+        }
+      } catch (e) {
+        console.error(e);
+      }
+    }
+
+    // Delete single batch
+    async function deleteBatch(batchId, ev) {
+      if (ev) ev.stopPropagation();
+      if (!confirm('Are you sure you want to delete this project and its clips?')) return;
+      try {
+        const res = await fetch(`/api/batches/${batchId}`, { method: 'DELETE' });
+        if (res.ok) {
+          showToast('Project deleted.');
+          if (currentBatchId === batchId) currentBatchId = null;
+          await loadBatches();
+        } else {
+          showToast('Failed to delete project', 'error');
+        }
+      } catch (e) {
+        showToast('Error deleting project', 'error');
+      }
+    }
+
+    // Purge unwanted test batches
+    async function purgeOldBatches() {
+      if (!confirm('Purge all duplicate test batches and keep active showcase project?')) return;
+      showToast('Purging test batches…', 'info');
+      try {
+        const res = await fetch('/api/batches');
+        const data = await res.json();
+        const batches = data.batches || [];
+        for (const b of batches) {
+          if (b.name.includes('Test') || b.name === '3-Day High Energy Batch') {
+            await fetch(`/api/batches/${b.id}`, { method: 'DELETE' });
+          }
+        }
+        showToast('Purge complete.');
+        currentBatchId = null;
+        await loadBatches();
+      } catch (e) {
+        showToast('Purge error', 'error');
+      }
+    }
+
+    async function selectBatch(batchId) {
+      if (!batchId) return;
+      currentBatchId = batchId;
+      document.getElementById('batchSelectTop').value = batchId;
+
+      try {
+        const res = await fetch(`/api/batches/${batchId}`);
+        const data = await res.json();
+        const b = data;
+        const approvedCount = (b.clips || []).filter(c => c.approval_status === 'APPROVED').length;
+
+        document.getElementById('activeBatchTitle').textContent = b.name || 'Batch';
+        document.getElementById('activeBatchStatusBadge').textContent = b.status || 'DRAFT';
+        document.getElementById('floatingApprovedCount').textContent = `${approvedCount} of 9 Approved`;
+
+        renderJobs(b.jobs || []);
+        renderSchedules(b.schedules || []);
+        loadBatchClips(batchId);
+      } catch (e) {
+        console.error(e);
+      }
+    }
+
+    document.getElementById('batchSelectTop').addEventListener('change', (e) => {
+      selectBatch(e.target.value);
+    });
+
+    // Load Batch Clips
+    async function loadBatchClips(batchId) {
+      try {
+        const res = await fetch(`/api/batches/${batchId}/clips`);
+        const data = await res.json();
+        currentClips = data.clips || [];
+        renderFilteredClips();
+      } catch (e) {
+        console.error(e);
+      }
+    }
+
+    function setClipFilter(filter) {
+      currentClipFilter = filter;
+      document.querySelectorAll('.filter-btn').forEach(b => {
+        b.className = 'filter-btn px-3 py-1.5 rounded-lg text-xs font-headline text-text-muted hover:text-white transition-colors';
+      });
+      if (event && event.target) {
+        event.target.className = 'filter-btn px-3 py-1.5 rounded-lg text-xs font-headline font-semibold text-secondary bg-surface-high border border-secondary/30';
+      }
+      renderFilteredClips();
+    }
+
+    // Render Filtered Clips (SupoClip / OpusClip Card Design)
+    function renderFilteredClips() {
+      const container = document.getElementById('clipsGrid');
+      let filtered = currentClips;
+
+      if (currentClipFilter === 'shorts') filtered = currentClips.filter(c => (c.format === 'SHORT' || c.clip_format === 'SHORT'));
+      else if (currentClipFilter === 'long') filtered = currentClips.filter(c => (c.format === 'LONG' || c.format === 'LONG_COMPILATION' || c.clip_format === 'LONG'));
+      else if (currentClipFilter === 'approved') filtered = currentClips.filter(c => c.approval_status === 'APPROVED');
+
+      if (filtered.length === 0) {
+        container.innerHTML = `
+          <div class="col-span-full py-16 text-center text-text-muted bg-surface-low border border-dashed border-border rounded-2xl">
+            <span class="material-symbols-outlined text-4xl text-text-subtle mb-2">movie_filter</span>
+            <p class="font-headline font-bold text-white text-base">No clips matching filter "${currentClipFilter}"</p>
+            <p class="text-xs text-text-subtle mt-1">Generate clips using the Ingest Bar above to see viral moments.</p>
+          </div>
+        `;
+        return;
+      }
+
+      container.innerHTML = filtered.map(c => {
+        const isPortrait = (c.format === 'SHORT' || c.clip_format === 'SHORT');
+        const isApproved = (c.approval_status === 'APPROVED');
+        const vScore = Math.round(c.hook_score || c.virality_score || 99);
+        const vTier = c.virality_grade || (vScore >= 95 ? 'A+' : (vScore >= 85 ? 'A' : 'B'));
+        const hookStrength = Math.round(c.hook_score || 99);
+        const flowCadence = Math.round(c.flow_score || 94);
+        const peakEngagement = Math.round(c.engagement_score || 96);
+        const trendAlignment = Math.round(c.trend_score || 92);
+
+        return `
+          <article class="bg-surface-low rounded-2xl border ${isApproved ? 'border-tertiary shadow-[0_0_24px_rgba(16,185,129,0.18)]' : 'border-border hover:border-secondary/50'} flex flex-col overflow-hidden transition-all group">
+            <!-- Video Player Viewport -->
+            <div class="video-viewport ${isPortrait ? 'portrait' : 'landscape'}">
+              <video id="video-${c.id}" controls playsinline preload="metadata" src="${c.video_url || ''}"></video>
+              
+              <!-- Virality Score Pill Overlay -->
+              <div class="absolute top-3 left-3 right-3 flex items-start justify-between pointer-events-none z-10">
+                <div class="flex items-center gap-1.5 pointer-events-auto">
+                  <div class="flex items-center gap-1.5 px-3 py-1 rounded-full bg-surface/95 backdrop-blur-md border ${vScore >= 90 ? 'border-tertiary text-tertiary' : 'border-secondary text-secondary'} font-mono text-xs font-extrabold shadow-lg">
+                    <span class="w-2 h-2 rounded-full ${vScore >= 90 ? 'bg-tertiary' : 'bg-secondary'} animate-pulse"></span>
+                    <span>${vScore}/100</span>
+                    <span class="text-[10px] text-text-muted ml-0.5 uppercase">${vTier} Viral</span>
+                  </div>
+                </div>
+                <span class="font-mono text-[10px] bg-surface/90 backdrop-blur-md px-2.5 py-1 rounded-lg text-text font-bold border border-border">
+                  ${Math.round(c.duration || 8)}s
+                </span>
+              </div>
+            </div>
+
+            <!-- Clip Details & Virality Radar -->
+            <div class="p-4 sm:p-5 space-y-3 bg-surface-card flex-1 flex flex-col justify-between">
+              <div>
+                <!-- Clip Title & Format Tag -->
+                <div class="flex items-start justify-between gap-2">
+                  <h3 class="font-headline font-bold text-white text-sm sm:text-base line-clamp-1">${c.title || 'Clip Untitled'}</h3>
+                  <span class="font-mono text-[10px] font-bold px-2 py-0.5 rounded-full ${isPortrait ? 'bg-primary/20 text-primary border border-primary/30' : 'bg-secondary/20 text-secondary border border-secondary/30'}">${c.format || 'SHORT'}</span>
+                </div>
+
+                <!-- OpusClip Virality Breakdown Radar -->
+                <div class="grid grid-cols-4 gap-1.5 mt-3 text-center font-mono text-[11px]">
+                  <div class="bg-surface p-1.5 rounded-xl border border-border">
+                    <div class="text-[10px] text-text-subtle">Hook</div>
+                    <div class="text-secondary font-bold">${hookStrength}%</div>
+                  </div>
+                  <div class="bg-surface p-1.5 rounded-xl border border-border">
+                    <div class="text-[10px] text-text-subtle">Flow</div>
+                    <div class="text-text font-bold">${flowCadence}%</div>
+                  </div>
+                  <div class="bg-surface p-1.5 rounded-xl border border-border">
+                    <div class="text-[10px] text-text-subtle">Peak</div>
+                    <div class="text-tertiary font-bold">${peakEngagement}%</div>
+                  </div>
+                  <div class="bg-surface p-1.5 rounded-xl border border-border">
+                    <div class="text-[10px] text-text-subtle">Trend</div>
+                    <div class="text-primary font-bold">${trendAlignment}%</div>
+                  </div>
+                </div>
+
+                <!-- Reason Why Viral -->
+                ${c.why_viral ? `
+                  <div class="mt-3 bg-surface/70 p-2.5 rounded-xl border border-border-subtle text-xs text-text-muted leading-relaxed">
+                    <span class="text-secondary font-semibold">💡 Why Viral:</span> ${c.why_viral}
+                  </div>
+                ` : ''}
+
+                <!-- Subtitle & Layout Dropdowns -->
+                <div class="flex items-center gap-2 mt-3 text-xs">
+                  <select id="layout-${c.id}" class="bg-surface text-text text-xs rounded-xl border border-border px-2.5 py-1.5 font-mono flex-1">
+                    <option value="FIT_BLUR" ${c.layout === 'FIT_BLUR' ? 'selected' : ''}>Fit Blur 9:16</option>
+                    <option value="FIT_BLACK" ${c.layout === 'FIT_BLACK' ? 'selected' : ''}>Fit Black 9:16</option>
+                  </select>
+                  <select id="caption-${c.id}" class="bg-surface text-text text-xs rounded-xl border border-border px-2.5 py-1.5 font-mono flex-1">
+                    <option value="KINETIC_YELLOW" ${c.caption_style === 'KINETIC_YELLOW' ? 'selected' : ''}>MrBeast Yellow</option>
+                    <option value="CLEAN_BOLD" ${c.caption_style === 'CLEAN_BOLD' ? 'selected' : ''}>Hormozi Clean</option>
+                  </select>
+                  <button onclick="rerenderClip('${c.id}')" class="p-2 rounded-xl bg-surface hover:bg-surface-high text-secondary border border-border transition-colors" title="Apply Opus Styling">
+                    <span class="material-symbols-outlined text-[16px]">sync</span>
+                  </button>
+                </div>
+              </div>
+
+              <!-- Action Bar (Approve, Download & YouTube Publish) -->
+              <div class="pt-3 border-t border-border flex flex-col gap-2">
+                <div class="flex items-center justify-between gap-2">
+                  <button onclick="toggleClipApproval('${c.id}', ${!isApproved})" class="flex-1 min-h-[40px] py-2 px-3 rounded-xl font-headline text-xs font-bold flex items-center justify-center gap-1.5 transition-all ${isApproved ? 'bg-gradient-to-r from-tertiary to-secondary text-white shadow-lg' : 'bg-surface-high hover:bg-surface-highest text-white border border-border'}">
+                    <span class="material-symbols-outlined text-[17px]">${isApproved ? 'check_circle' : 'radio_button_unchecked'}</span>
+                    <span>${isApproved ? 'Approved ✓' : 'Approve Clip'}</span>
+                  </button>
+
+                  <a href="${c.video_url || '#'}" download class="min-h-[40px] px-3.5 rounded-xl bg-surface hover:bg-surface-high text-text-muted hover:text-white border border-border flex items-center justify-center transition-colors" title="Download MP4">
+                    <span class="material-symbols-outlined text-[18px]">download</span>
+                  </a>
+                </div>
+
+                ${c.youtube_url ? `
+                  <a href="${c.youtube_url}" target="_blank" class="w-full min-h-[38px] py-2 px-3 rounded-xl font-headline text-xs font-bold flex items-center justify-center gap-1.5 bg-tertiary/15 text-tertiary border border-tertiary/40 hover:bg-tertiary/25 transition-all">
+                    <span class="material-symbols-outlined text-[17px]">smart_display</span>
+                    <span>Live on YouTube ↗</span>
+                  </a>
+                ` : `
+                  <button onclick="publishClipToYouTube('${c.id}')" class="w-full min-h-[38px] py-2 px-3 rounded-xl font-headline text-xs font-bold flex items-center justify-center gap-1.5 bg-gradient-to-r from-red-600 to-rose-600 hover:brightness-110 text-white shadow-md transition-all active:scale-98">
+                    <span class="material-symbols-outlined text-[17px]">upload</span>
+                    <span>Publish to YouTube</span>
+                  </button>
+                `}
+              </div>
+            </div>
+          </article>
+        `;
+      }).join('');
+    }
+
+    // Clip Approval Toggle
+    async function toggleClipApproval(clipId, approve) {
+      try {
+        const res = await fetch(`/api/clips/${clipId}/approve`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ status: approve ? 'APPROVED' : 'PENDING' })
+        });
+        if (res.ok) {
+          showToast(approve ? 'Clip approved for 3-Day schedule!' : 'Approval revoked.');
+          selectBatch(currentBatchId);
+        }
+      } catch (e) {
+        showToast('Approval update failed', 'error');
+      }
+    }
+
+    // Re-render Opus Clip
+    async function rerenderClip(clipId) {
+      const layout = document.getElementById(`layout-${clipId}`).value;
+      const caption = document.getElementById(`caption-${clipId}`).value;
+      showToast('Re-rendering with Opus Styler…', 'info');
+
+      try {
+        const res = await fetch(`/api/clips/${clipId}/re-render`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ layout, caption_style: caption })
+        });
+        if (res.ok) {
+          showToast('Clip re-rendered successfully!');
+          selectBatch(currentBatchId);
+        } else {
+          showToast('Re-render failed', 'error');
+        }
+      } catch (e) {
+        showToast('Re-render error', 'error');
+      }
+    }
+
+    // Render Jobs
+    function renderJobs(jobs) {
+      const cont = document.getElementById('jobsContainer');
+      if (jobs.length === 0) {
+        cont.innerHTML = '<div class="text-xs text-text-subtle py-2">No active background jobs. Daemon is idle.</div>';
+        return;
+      }
+      cont.innerHTML = jobs.map(j => `
+        <div class="flex items-center justify-between p-3.5 rounded-xl bg-surface border border-border">
+          <div class="flex items-center gap-3">
+            <span class="w-2.5 h-2.5 rounded-full ${j.status === 'COMPLETED' ? 'bg-tertiary' : (j.status === 'FAILED' ? 'bg-error' : 'bg-secondary animate-pulse')}"></span>
+            <div>
+              <div class="font-headline text-xs font-bold text-white">${j.id}</div>
+              <div class="text-[11px] text-text-subtle">${j.stage_message || j.progress_message || 'Processing…'}</div>
+            </div>
+          </div>
+          <span class="font-mono text-[10px] px-2.5 py-1 rounded-full bg-surface-high ${j.status === 'COMPLETED' ? 'text-tertiary' : 'text-secondary'} border border-border font-bold uppercase">${j.status}</span>
+        </div>
+      `).join('');
+    }
+
+    // Render 3-Day Schedule Slots
+    function renderSchedules(slots) {
+      const tbody = document.getElementById('scheduleTableBody');
+      if (!tbody) return;
+      if (slots.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="5" class="p-5 text-center text-text-subtle">No release slots configured. Approve clips in Studio to slot them.</td></tr>';
+        return;
+      }
+      tbody.innerHTML = slots.map(s => {
+        const isCommitted = s.status === 'COMMITTED' || s.youtube_video_id;
+        const statusHtml = isCommitted
+          ? `<a href="https://www.youtube.com/watch?v=${s.youtube_video_id || ''}" target="_blank" class="px-2.5 py-0.5 rounded-full text-[10px] uppercase font-bold bg-tertiary/20 text-tertiary border border-tertiary/30 hover:underline flex items-center gap-1 w-fit"><span>COMMITTED</span><span class="material-symbols-outlined text-[12px]">open_in_new</span></a>`
+          : `<span class="px-2.5 py-0.5 rounded-full text-[10px] uppercase font-bold ${s.status === 'APPROVED' ? 'bg-secondary/20 text-secondary border border-secondary/30' : 'bg-surface-high text-text-subtle'}">${s.status || 'PENDING'}</span>`;
+
+        return `
+          <tr class="hover:bg-surface-card transition-colors">
+            <td class="p-3.5 text-white font-bold">Slot #${s.slot_number}</td>
+            <td class="p-3.5"><span class="px-2.5 py-0.5 rounded-full text-[10px] font-bold ${s.format === 'SHORT' ? 'bg-primary/20 text-primary border border-primary/30' : 'bg-secondary/20 text-secondary border border-secondary/30'}">${s.format}</span></td>
+            <td class="p-3.5 text-text-muted">${s.slot_time || s.scheduled_at || '12:00 PM'}</td>
+            <td class="p-3.5 text-white truncate max-w-[200px]">${s.clip_id || 'Pending Approval'}</td>
+            <td class="p-3.5">${statusHtml}</td>
+          </tr>
+        `;
+      }).join('');
+    }
+
+    // Start Batch Processing
+    document.getElementById('btnStartBatchProcessing').addEventListener('click', async () => {
+      if (!currentBatchId) return showToast('Please select a project first', 'error');
+      showToast('Starting autonomous pipeline…');
+      try {
+        const res = await fetch(`/api/batches/${currentBatchId}/start`, { method: 'POST' });
+        if (res.ok) {
+          showToast('Batch worker processing started!');
+          selectBatch(currentBatchId);
+        } else {
+          showToast('Failed to start worker', 'error');
+        }
+      } catch (e) {
+        showToast('Network error starting worker', 'error');
+      }
+    });
+
+    // Auto-create batch helper for 1-click ingest
+    async function ensureActiveBatch(defaultName = 'Viral Clip Project') {
+      if (currentBatchId) return currentBatchId;
+      showToast('Creating new project…', 'info');
+      try {
+        const createRes = await fetch('/api/batches', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            name: `${defaultName} ${new Date().toLocaleDateString([], { month: 'short', day: 'numeric' })}`,
+            target_videos_per_day: 3,
+            schedule_days: 3,
+            timezone: 'Asia/Kolkata',
+            language: 'en',
+            whisper_model: 'small'
+          })
+        });
+        const data = await createRes.json();
+        const newId = data.id || data.batch_id;
+        await loadBatches();
+        currentBatchId = newId;
+        return newId;
+      } catch (err) {
+        console.error('Error creating batch:', err);
+        return null;
+      }
+    }
+
+    // File Drag & Drop Upload
+    const fileInput = document.getElementById('fileInput');
+    if (fileInput) {
+      fileInput.addEventListener('change', (e) => {
+        if (e.target.files.length > 0) uploadFile(e.target.files[0]);
+      });
+    }
+
+    async function uploadFile(file) {
+      const batchId = await ensureActiveBatch('Upload ' + file.name.replace(/\.[^/.]+$/, ''));
+      if (!batchId) return showToast('Failed to initialize project', 'error');
+      showToast(`Uploading ${file.name}…`, 'info');
+      const fd = new FormData();
+      fd.append('file', file);
+      try {
+        const res = await fetch(`/api/batches/${batchId}/upload-source`, { method: 'POST', body: fd });
+        if (res.ok) {
+          showToast('Uploaded successfully! Generating viral clips…');
+          selectBatch(batchId);
+          switchTab('tab-studio');
+        } else {
+          showToast('Upload failed', 'error');
+        }
+      } catch (e) {
+        showToast('Upload error', 'error');
+      }
+    }
+
+    // Source URL Form (Hero Generator Submit)
+    document.getElementById('sourceUrlForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const fd = new FormData(e.target);
+      const url = fd.get('source_url');
+      if (!url) return;
+
+      const batchId = await ensureActiveBatch('YouTube Viral Ingest');
+      if (!batchId) return showToast('Failed to initialize project', 'error');
+
+      showToast('Importing video & analyzing viral moments…', 'info');
+
+      try {
+        const res = await fetch(`/api/batches/${batchId}/sources`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ source_url: url, title: 'Viral Video Source' })
+        });
+        const data = await res.json();
+        if (res.ok) {
+          showToast('Video imported! Generating clips…');
+          selectBatch(batchId);
+          document.getElementById('sourceUrlInput').value = '';
+        } else {
+          showToast(data.detail || 'Import failed', 'error');
+        }
+      } catch (err) {
+        showToast('Error importing source', 'error');
+      }
+    });
+
+    // Create New Project Modal Handlers
+    function openNewBatchModal() { document.getElementById('newBatchModal').classList.remove('hidden'); }
+    function closeNewBatchModal() { document.getElementById('newBatchModal').classList.add('hidden'); }
+
+    document.getElementById('createBatchForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const fd = new FormData(e.target);
+      const payload = {
+        name: fd.get('name'),
+        schedule_days: parseInt(fd.get('target_days'), 10),
+        target_videos_per_day: parseInt(fd.get('target_videos_per_day'), 10),
+        timezone: fd.get('schedule_timezone')
+      };
+
+      try {
+        const res = await fetch('/api/batches', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+        const data = await res.json();
+        if (res.ok) {
+          closeNewBatchModal();
+          showToast('Project created!');
+          await loadBatches();
+          selectBatch(data.id || (data.batch && data.batch.id));
+        }
+      } catch (e) {
+        showToast('Failed to create project', 'error');
+      }
+    });
+
+    // Export ZIP
+    async function exportZip() {
+      if (!currentBatchId) return showToast('Select a project first', 'error');
+      window.open(`/api/batches/${currentBatchId}/download-zip`, '_blank');
+    }
+    document.getElementById('btnExportZip').addEventListener('click', exportZip);
+    document.getElementById('floatingExportZipBtn').addEventListener('click', exportZip);
+
+    // Commit Schedule to YouTube Cloud
+    async function commitSchedule() {
+      if (!currentBatchId) return showToast('Select a project first', 'error');
+
+      // Check YouTube connection first
+      const ytRes = await fetch('/api/youtube/status');
+      const ytData = await ytRes.json();
+      if (!ytData.connected) {
+        showToast('Please connect your YouTube channel first', 'warning');
+        openYouTubeModal();
+        return;
+      }
+
+      showToast('Committing approved clips to YouTube Cloud schedule…', 'info');
+      try {
+        // Step 1: Ensure slots exist
+        await fetch(`/api/batches/${currentBatchId}/schedule`, { method: 'POST' });
+
+        // Step 2: Upload and commit to YouTube
+        const res = await fetch(`/api/batches/${currentBatchId}/commit-cloud-schedule`, { method: 'POST' });
+        const data = await res.json();
+        if (res.ok) {
+          showToast(`🎉 Scheduled ${data.count || 0} videos to YouTube!`, 'success');
+          selectBatch(currentBatchId);
+          switchTab('tab-schedule');
+        } else {
+          showToast(data.detail || 'Schedule commit failed', 'error');
+        }
+      } catch (e) {
+        showToast('Error committing schedule: ' + e.message, 'error');
+      }
+    }
+    document.getElementById('floatingCommitBtn').addEventListener('click', commitSchedule);
+    document.getElementById('btnCommitSchedule').addEventListener('click', commitSchedule);
+
+    // Server Info & Mobile QR Modal
+    function openMobileModal() { document.getElementById('modalMobilePairing').classList.remove('hidden'); }
+    function closeMobileModal() { document.getElementById('modalMobilePairing').classList.add('hidden'); }
+
+    async function loadServerInfo() {
+      try {
+        const res = await fetch('/api/server-info');
+        const data = await res.json();
+        serverHost = `${data.local_ip || data.ip || '192.168.1.9'}:${data.port || 8765}`;
+        const fullUrl = data.web_url || `http://${serverHost}`;
+        document.getElementById('modalHostUrl').textContent = fullUrl;
+        document.getElementById('settingsHostUrl').textContent = fullUrl;
+
+        // Render QR in modal
+        const qrEl = document.getElementById('modalQrCode');
+        qrEl.innerHTML = '';
+        new QRCode(qrEl, {
+          text: fullUrl,
+          width: 160,
+          height: 160,
+          colorDark: '#0B0F17',
+          colorLight: '#ffffff',
+          correctLevel: QRCode.CorrectLevel.H
+        });
+
+        // Render QR in settings tab
+        const qrSettingsEl = document.getElementById('settingsQrCode');
+        qrSettingsEl.innerHTML = '';
+        new QRCode(qrSettingsEl, {
+          text: fullUrl,
+          width: 160,
+          height: 160,
+          colorDark: '#0B0F17',
+          colorLight: '#ffffff',
+          correctLevel: QRCode.CorrectLevel.H
+        });
+      } catch (e) {
+        console.error(e);
+      }
+    }
+
+    // Server Logs
+    async function refreshServerLogs() {
+      try {
+        const res = await fetch('/api/server-logs');
+        const data = await res.json();
+        const logs = data.logs || [];
+        document.getElementById('logOutput').textContent = Array.isArray(logs) ? logs.join('\n') : (data.logs || 'No log data.');
+      } catch (e) {
+        document.getElementById('logOutput').textContent = 'Could not load server logs.';
+      }
+    }
+
+    // =========================================================================
+    // CHAT SPIKE DETECTION JAVASCRIPT LOGIC
+    // =========================================================================
+    let chatPollTimer = null;
+
+    async function startChatEngine(e) {
+      if (e) e.preventDefault();
+      const target = document.getElementById('chatStreamTarget').value.trim();
+      const sourceType = document.getElementById('chatSourceType').value;
+      const sensitivity = document.getElementById('chatSensitivity').value;
+      if (!target) return showToast('Please enter a channel or stream target', 'warning');
+
+      showToast('Starting real-time live chat monitor…', 'info');
+      try {
+        const res = await fetch('/api/chat-engine/start', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ stream_target: target, source_type: sourceType, sensitivity: sensitivity })
+        });
+        const data = await res.json();
+        if (res.ok) {
+          showToast('Live chat monitoring started! Listening for spikes…', 'success');
+          updateChatEngineUI(data.session);
+          startChatPolling();
+        } else {
+          showToast(data.detail || 'Failed to start chat monitor', 'error');
+        }
+      } catch (err) {
+        showToast('Error starting chat engine: ' + err.message, 'error');
+      }
+    }
+
+    async function stopChatEngine() {
+      showToast('Stopping chat engine…', 'info');
+      try {
+        const res = await fetch('/api/chat-engine/stop', { method: 'POST' });
+        const data = await res.json();
+        showToast('Chat monitoring stopped.', 'info');
+        updateChatEngineUI(data.session);
+      } catch (err) {
+        showToast('Error stopping chat engine: ' + err.message, 'error');
+      }
+    }
+
+    async function simulateChatHype() {
+      showToast('Launching simulated stream with hype spikes…', 'info');
+      try {
+        const res = await fetch('/api/chat-engine/simulate', { method: 'POST' });
+        const data = await res.json();
+        showToast('Simulated live stream started! Watch the velocity meter spike.', 'success');
+        updateChatEngineUI(data.session);
+        startChatPolling();
+      } catch (err) {
+        showToast('Simulation error: ' + err.message, 'error');
+      }
+    }
+
+    function startChatPolling() {
+      if (chatPollTimer) clearInterval(chatPollTimer);
+      chatPollTimer = setInterval(pollChatEngineStatus, 1500);
+      pollChatEngineStatus();
+    }
+
+    async function pollChatEngineStatus() {
+      try {
+        const res = await fetch('/api/chat-engine/status');
+        const data = await res.json();
+        updateChatEngineUI(data);
+        if (data.is_active || (data.recent_spikes && data.recent_spikes.length > 0)) {
+          refreshChatSpikes();
+        }
+      } catch (e) {}
+    }
+
+    function updateChatEngineUI(status) {
+      if (!status) return;
+      const dot = document.getElementById('chatEngineStatusDot');
+      const text = document.getElementById('chatEngineStatusText');
+      const btnStart = document.getElementById('btnStartChatEngine');
+      const btnStop = document.getElementById('btnStopChatEngine');
+      const badge = document.getElementById('navChatSpikesBadge');
+
+      const isAct = !!status.is_active;
+      if (dot) dot.className = `w-2.5 h-2.5 rounded-full ${isAct ? 'bg-red-500 animate-pulse' : 'bg-text-subtle'}`;
+      if (text) {
+        text.textContent = isAct ? `LIVE (${status.source_type || 'Active'})` : 'Idle';
+        text.className = isAct ? 'text-red-400 font-bold' : 'text-text-muted font-bold';
+      }
+      if (btnStart) btnStart.classList.toggle('hidden', isAct);
+      if (btnStop) btnStop.classList.toggle('hidden', !isAct);
+      if (badge) badge.classList.toggle('hidden', !isAct);
+
+      document.getElementById('metricCurrentMps').textContent = (status.current_mps || 0.0).toFixed(1);
+      document.getElementById('metricBaselineMps').textContent = (status.baseline_mps || 0.5).toFixed(1);
+      document.getElementById('metricTotalSpikes').textContent = status.total_spikes || 0;
+      document.getElementById('metricTotalMsgs').textContent = status.total_messages || 0;
+
+      // Animate velocity bar (scale 0-25 MPS)
+      const mpsBar = document.getElementById('barCurrentMps');
+      if (mpsBar) {
+        const pct = Math.min(100, Math.round(((status.current_mps || 0.0) / 20.0) * 100));
+        mpsBar.style.width = `${pct}%`;
+        mpsBar.className = pct > 60 ? 'bg-red-500 h-full rounded-full transition-all duration-300' : 'bg-secondary h-full rounded-full transition-all duration-300';
+      }
+    }
+
+    async function refreshChatSpikes() {
+      try {
+        const res = await fetch('/api/chat-engine/spikes');
+        const data = await res.json();
+        renderChatSpikes(data.spikes || []);
+      } catch (e) {}
+    }
+
+    function renderChatSpikes(spikes) {
+      const cont = document.getElementById('chatSpikesContainer');
+      if (!cont) return;
+      if (!spikes || spikes.length === 0) {
+        cont.innerHTML = `
+          <div class="p-8 text-center bg-surface-low border border-dashed border-border rounded-2xl text-text-muted text-xs">
+            No chat spikes detected yet. Start live monitoring or click "Run 1-Click Simulation Demo" above to watch the engine detect hype moments in real-time.
+          </div>
+        `;
+        return;
+      }
+
+      cont.innerHTML = spikes.map(sp => {
+        const conf = Math.round(sp.confidence_score || 75);
+        const emotes = (sp.dominant_emotes || []).join(' ') || '🔥';
+        const keywords = (sp.dominant_keywords || []).join(', ') || 'Peak Activity';
+        const duration = Math.round(sp.duration || 60);
+
+        return `
+          <article class="bg-surface-low border border-border hover:border-red-500/40 rounded-2xl p-4 sm:p-5 transition-all space-y-3">
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-border/60 pb-3">
+              <div class="space-y-0.5">
+                <div class="flex items-center gap-2">
+                  <h4 class="font-headline font-bold text-white text-sm sm:text-base">${sp.title || 'Live Hype Surge'}</h4>
+                  <span class="font-mono text-[10px] px-2 py-0.5 rounded-full bg-red-600/20 text-red-400 border border-red-500/30 font-bold uppercase">${sp.status || 'DETECTED'}</span>
+                </div>
+                <p class="text-xs text-text-muted">${sp.description || ''}</p>
+              </div>
+
+              <!-- Confidence Pill -->
+              <div class="flex items-center gap-2 self-start sm:self-auto">
+                <div class="px-3 py-1 rounded-full bg-surface-card border ${conf >= 80 ? 'border-tertiary text-tertiary' : 'border-secondary text-secondary'} font-mono text-xs font-extrabold flex items-center gap-1.5 shadow-sm">
+                  <span class="w-2 h-2 rounded-full ${conf >= 80 ? 'bg-tertiary' : 'bg-secondary'} animate-pulse"></span>
+                  <span>${conf}/100 Confidence</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Stats Grid -->
+            <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs font-mono text-center">
+              <div class="bg-surface p-2 rounded-xl border border-border">
+                <div class="text-[10px] text-text-subtle">Peak Rate</div>
+                <div class="text-red-400 font-bold">${(sp.peak_mps || 0).toFixed(1)} MPS</div>
+              </div>
+              <div class="bg-surface p-2 rounded-xl border border-border">
+                <div class="text-[10px] text-text-subtle">Baseline Avg</div>
+                <div class="text-text font-bold">${(sp.baseline_mps || 0.5).toFixed(1)} MPS</div>
+              </div>
+              <div class="bg-surface p-2 rounded-xl border border-border">
+                <div class="text-[10px] text-text-subtle">Statistical Z-Score</div>
+                <div class="text-secondary font-bold">${(sp.z_score || 0).toFixed(2)}σ</div>
+              </div>
+              <div class="bg-surface p-2 rounded-xl border border-border">
+                <div class="text-[10px] text-text-subtle">Clip Window</div>
+                <div class="text-tertiary font-bold">${Math.round(sp.clip_start || 0)}s - ${Math.round(sp.clip_end || 0)}s (${duration}s)</div>
+              </div>
+            </div>
+
+            <!-- Footer: Dominant Signals & Clip Video Player -->
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-1">
+              <div class="flex items-center gap-2 text-xs">
+                <span class="text-text-subtle font-medium">Hype Emotes:</span>
+                <span class="px-2 py-0.5 rounded-lg bg-surface border border-border font-headline font-semibold text-white">${emotes}</span>
+                <span class="text-text-subtle ml-1 font-medium">Keywords:</span>
+                <span class="text-text-muted text-[11px] font-mono">${keywords}</span>
+              </div>
+
+              ${sp.clip_path ? `
+                <div class="flex items-center gap-2">
+                  <a href="/outputs/chat_highlights/${sp.spike_id}.mp4" download class="px-3 py-1.5 bg-surface hover:bg-surface-high text-white text-xs font-headline font-semibold rounded-xl border border-border transition-colors flex items-center gap-1">
+                    <span class="material-symbols-outlined text-[15px]">download</span>
+                    <span>Download MP4</span>
+                  </a>
+                </div>
+              ` : `
+                <span class="font-mono text-[11px] text-text-subtle">Timestamp Bookmarked at ${Math.round(sp.peak_time || 0)}s</span>
+              `}
+            </div>
+          </article>
+        `;
+      }).join('');
+    }
+
+    // =========================================================================
+    // TREND HUNTER & AUTOMATIC VIRAL CLIP EXTRACTION FRONTEND LOGIC
+    // =========================================================================
+    let trendHunterPollTimer = null;
+    let currentReviewFilter = 'ALL';
+    let cachedReviewClips = [];
+
+    function startTrendHunterPolling() {
+      if (trendHunterPollTimer) clearInterval(trendHunterPollTimer);
+      trendHunterPollTimer = setInterval(pollTrendHunterStatus, 2500);
+      pollTrendHunterStatus();
+    }
+
+    async function pollTrendHunterStatus() {
+      try {
+        const res = await fetch('/api/trend-hunter/status');
+        if (!res.ok) return;
+        const data = await res.json();
+        updateTrendHunterDashboard(data);
+      } catch (e) {}
+    }
+
+    async function loadTrendHunterData() {
+      await pollTrendHunterStatus();
+      await refreshReviewQueue();
+    }
+
+    function updateTrendHunterDashboard(data) {
+      if (!data) return;
+
+      // Telemetry Counters
+      const countMonitored = data.monitored_streams_count || 0;
+      const countChannels = data.total_tracked_channels || (data.tracked_channels ? data.tracked_channels.length : 0);
+      document.getElementById('thMetricMonitoredStreams').textContent = countMonitored;
+      document.getElementById('thMetricTrackedChannels').textContent = countChannels;
+
+      const badge = document.getElementById('navTrendHunterBadge');
+      if (badge) badge.classList.toggle('hidden', countMonitored === 0);
+
+      // Sync Automation Level select if updated
+      if (data.automation_level) {
+        const autoSel = document.getElementById('thAutomationLevelSelect');
+        if (autoSel && autoSel.value !== data.automation_level) {
+          autoSel.value = data.automation_level;
+        }
+      }
+
+      // Highest demand score
+      let highestDemand = 0;
+      if (data.tracked_channels) {
+        data.tracked_channels.forEach(ch => {
+          if ((ch.demand_score || 0) > highestDemand) highestDemand = ch.demand_score;
+        });
+      }
+      document.getElementById('thMetricHighestDemand').textContent = highestDemand > 0 ? `${highestDemand.toFixed(0)}/100` : '--';
+
+      // Active Cockpit
+      const cockpit = document.getElementById('thActiveCockpit');
+      if (data.active_sessions && data.active_sessions.length > 0) {
+        cockpit.classList.remove('hidden');
+        const sess = data.active_sessions[0];
+        document.getElementById('thActiveChannelTitle').textContent = `🔴 Live: ${sess.channel_name} (${sess.platform.toUpperCase()})`;
+        document.getElementById('thActiveStreamUrl').textContent = sess.stream_url;
+        document.getElementById('thBufferDuration').textContent = `${(sess.buffer_duration_seconds || 0).toFixed(1)}s / 300s`;
+        document.getElementById('thLiveMps').textContent = `${(sess.current_mps || 0).toFixed(1)} MPS`;
+        document.getElementById('thAudioLevel').textContent = `${(sess.current_audio_db || -40).toFixed(1)} dB`;
+        document.getElementById('thDemandScore').textContent = `${(sess.current_demand_score || 0).toFixed(0)}/100`;
+
+        const mpsBar = document.getElementById('thMpsBar');
+        if (mpsBar) {
+          const pct = Math.min(100, Math.round(((sess.current_mps || 0) / 20.0) * 100));
+          mpsBar.style.width = `${pct}%`;
+        }
+      } else {
+        cockpit.classList.add('hidden');
+      }
+
+      // Render Tracked Channels
+      renderTrendChannels(data.tracked_channels || [], data.active_sessions || []);
+    }
+
+    function renderTrendChannels(channels, activeSessions) {
+      const cont = document.getElementById('thChannelsContainer');
+      if (!cont) return;
+      if (!channels || channels.length === 0) {
+        cont.innerHTML = `
+          <div class="p-8 text-center bg-surface-low border border-dashed border-border rounded-2xl text-text-muted text-xs col-span-full">
+            No tracked channels yet. Use the search bar above or click one of the trending seed chips (e.g. IShowSpeed, KaiCenat) to start monitoring!
+          </div>
+        `;
+        return;
+      }
+
+      const activeChannelIds = new Set(activeSessions.map(s => s.channel_id));
+
+      cont.innerHTML = channels.map(ch => {
+        const isLive = !!ch.is_live;
+        const isMonitored = activeChannelIds.has(ch.id);
+        const score = Math.round(ch.demand_score || 40);
+        const viewers = ch.current_viewers ? ch.current_viewers.toLocaleString() : 'Offline';
+        const isYt = ch.platform.toLowerCase() === 'youtube';
+        const priority = ch.custom_priority || 1;
+        const isSurging = !!ch.is_rapid_growing;
+
+        return `
+          <div class="bg-surface-low border ${isMonitored ? 'border-amber-500/50 shadow-amber-500/10' : 'border-border'} hover:border-amber-400/40 rounded-2xl p-4 sm:p-5 transition-all space-y-3.5 flex flex-col justify-between">
+            <div class="space-y-2">
+              <div class="flex items-center justify-between gap-2">
+                <div class="flex items-center gap-2">
+                  <span class="px-2 py-0.5 rounded-lg text-[10px] font-mono font-bold uppercase ${isYt ? 'bg-red-500/20 text-red-400 border border-red-500/30' : 'bg-purple-500/20 text-purple-400 border border-purple-500/30'}">
+                    ${ch.platform}
+                  </span>
+                  <span class="font-headline font-bold text-white text-sm sm:text-base">${ch.channel_name}</span>
+                  ${isSurging ? '<span class="px-2 py-0.2 rounded-full text-[9px] font-mono font-extrabold bg-amber-500/25 text-amber-300 border border-amber-500/40 animate-pulse">⚡ SURGING</span>' : ''}
+                </div>
+
+                <!-- Live Status Pill -->
+                <div class="flex items-center gap-1.5 px-2.5 py-0.5 rounded-full ${isLive ? 'bg-red-600/20 text-red-400 border border-red-500/30' : 'bg-surface text-text-subtle border border-border'} font-mono text-[10px] font-bold">
+                  <span class="w-2 h-2 rounded-full ${isLive ? 'bg-red-500 animate-pulse' : 'bg-text-subtle'}"></span>
+                  <span>${isLive ? 'LIVE' : 'OFFLINE'}</span>
+                </div>
+              </div>
+
+              <!-- Stream title & category -->
+              <p class="text-xs text-text-muted truncate">${ch.stream_title || ch.category || 'Streaming Live'}</p>
+
+              <!-- Demand Score & Viewers Bar -->
+              <div class="grid grid-cols-2 gap-2 text-xs font-mono pt-1">
+                <div class="bg-surface p-2 rounded-xl border border-border">
+                  <div class="text-[10px] text-text-subtle">Viewers</div>
+                  <div class="font-bold ${isLive ? 'text-white' : 'text-text-subtle'}">${viewers}</div>
+                </div>
+                <div class="bg-surface p-2 rounded-xl border border-border">
+                  <div class="text-[10px] text-text-subtle">Demand Score</div>
+                  <div class="font-bold ${score >= 80 ? 'text-tertiary' : score >= 60 ? 'text-amber-400' : 'text-text-muted'}">${score}/100</div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Action Buttons -->
+            <div class="flex items-center justify-between gap-2 pt-2 border-t border-border/60">
+              <button onclick="${isMonitored ? `stopChannelMonitoring('${ch.id}')` : `startChannelMonitoring('${ch.id}')`}"
+                class="flex-1 py-2 px-3 rounded-xl font-headline text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${isMonitored ? 'bg-red-600/20 hover:bg-red-600/30 text-red-400 border border-red-500/40' : 'bg-amber-500 hover:bg-amber-400 text-black shadow-md'}">
+                <span class="material-symbols-outlined text-[16px]">${isMonitored ? 'stop_circle' : 'radar'}</span>
+                <span>${isMonitored ? 'Stop Monitor' : 'Start Live Monitor'}</span>
+              </button>
+
+              <button onclick="toggleChannelPriority('${ch.id}', ${priority >= 3 ? 1 : priority + 1})" title="Toggle Priority (Normal/High/Pin)" class="p-2 rounded-xl bg-surface hover:bg-surface-high ${priority > 1 ? 'text-amber-400 border-amber-500/50' : 'text-text-subtle'} border border-border transition-colors">
+                <span class="material-symbols-outlined text-[16px]">${priority === 3 ? 'push_pin' : priority === 2 ? 'star' : 'star_border'}</span>
+              </button>
+
+              <button onclick="deleteTrackedChannel('${ch.id}')" title="Remove Channel" class="p-2 rounded-xl bg-surface hover:bg-surface-high text-text-subtle hover:text-red-400 border border-border transition-colors">
+                <span class="material-symbols-outlined text-[16px]">delete</span>
+              </button>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    async function searchOrAddChannel() {
+      const input = document.getElementById('thSearchInput');
+      const query = (input.value || '').trim();
+      const platform = document.getElementById('thPlatformSelect').value;
+      if (!query) {
+        showToast('Please enter a channel name or URL', 'info');
+        return;
+      }
+
+      showToast(`Discovering channel "${query}"...`, 'info');
+      try {
+        const res = await fetch('/api/trend-hunter/channels', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ query: query, platform: platform === 'all' ? null : platform })
+        });
+        if (!res.ok) throw new Error(await res.text());
+        const data = await res.json();
+        input.value = '';
+        showToast(`Channel "${data.channel.channel_name}" tracked!`, 'success');
+        loadTrendHunterData();
+      } catch (err) {
+        showToast('Discovery failed: ' + err.message, 'error');
+      }
+    }
+
+    async function quickAddChannel(query, platform) {
+      document.getElementById('thSearchInput').value = query;
+      document.getElementById('thPlatformSelect').value = platform;
+      await searchOrAddChannel();
+    }
+
+    async function deleteTrackedChannel(channelId) {
+      try {
+        const res = await fetch(`/api/trend-hunter/channels/${encodeURIComponent(channelId)}`, { method: 'DELETE' });
+        if (res.ok) {
+          showToast('Channel removed', 'info');
+          loadTrendHunterData();
+        }
+      } catch (e) {}
+    }
+
+    async function startChannelMonitoring(channelId) {
+      const sens = document.getElementById('thSensitivitySelect').value;
+      showToast('Starting live stream buffer and spike detection...', 'info');
+      try {
+        const res = await fetch('/api/trend-hunter/monitor/start', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ channel_id: channelId, sensitivity: sens })
+        });
+        if (!res.ok) throw new Error(await res.text());
+        showToast('Live stream monitor active! Buffer is rolling.', 'success');
+        startTrendHunterPolling();
+      } catch (err) {
+        showToast('Failed to start monitoring: ' + err.message, 'error');
+      }
+    }
+
+    async function stopChannelMonitoring(channelId) {
+      try {
+        const res = await fetch('/api/trend-hunter/monitor/stop', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ channel_id: channelId })
+        });
+        if (res.ok) {
+          showToast('Live monitoring stopped.', 'info');
+          pollTrendHunterStatus();
+        }
+      } catch (e) {}
+    }
+
+    async function stopActiveMonitoring() {
+      try {
+        const res = await fetch('/api/trend-hunter/status');
+        const data = await res.json();
+        if (data.active_sessions && data.active_sessions.length > 0) {
+          await stopChannelMonitoring(data.active_sessions[0].channel_id);
+        }
+      } catch (e) {}
+    }
+
+    async function runTrendHunterSimulation() {
+      showToast('Launching simulated live stream with hype burst...', 'info');
+      try {
+        const res = await fetch('/api/trend-hunter/simulate', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ channel_name: 'IShowSpeed', platform: 'youtube' })
+        });
+        if (!res.ok) throw new Error(await res.text());
+        showToast('Simulated stream running! Watch the cockpit metrics spike.', 'success');
+        startTrendHunterPolling();
+      } catch (err) {
+        showToast('Simulation error: ' + err.message, 'error');
+      }
+    }
+
+    async function refreshReviewQueue() {
+      try {
+        const res = await fetch('/api/trend-hunter/review-queue');
+        if (!res.ok) return;
+        const data = await res.json();
+        cachedReviewClips = data.clips || [];
+        document.getElementById('thMetricClipsExtracted').textContent = cachedReviewClips.length;
+        const pendingCount = cachedReviewClips.filter(c => c.status === 'PENDING_REVIEW').length;
+        document.getElementById('thReviewQueueBadge').textContent = `${pendingCount} Pending`;
+        renderReviewQueue(cachedReviewClips);
+      } catch (e) {}
+    }
+
+    function filterReviewQueue(filter) {
+      currentReviewFilter = filter;
+      document.querySelectorAll('.th-filter-btn').forEach(btn => {
+        if (btn.textContent.trim().toUpperCase() === filter.replace('_', ' ')) {
+          btn.className = 'th-filter-btn px-3 py-1 rounded-lg bg-surface-high text-white font-semibold';
+        } else {
+          btn.className = 'th-filter-btn px-3 py-1 rounded-lg text-text-muted hover:text-white';
+        }
+      });
+      renderReviewQueue(cachedReviewClips);
+    }
+
+    function renderReviewQueue(clips) {
+      const cont = document.getElementById('thReviewQueueContainer');
+      if (!cont) return;
+
+      const filtered = (clips || []).filter(c => {
+        if (currentReviewFilter === 'ALL') return true;
+        return c.status === currentReviewFilter;
+      });
+
+      if (filtered.length === 0) {
+        cont.innerHTML = `
+          <div class="p-8 text-center bg-surface-low border border-dashed border-border rounded-2xl text-text-muted text-xs col-span-full">
+            No clips found for filter "${currentReviewFilter}". When live stream hype moments trigger, 9:16 Shorts with subtitles will appear here automatically.
+          </div>
+        `;
+        return;
+      }
+
+      cont.innerHTML = filtered.map(c => {
+        const conf = Math.round(c.confidence_score || 80);
+        const isPublished = c.status === 'PUBLISHED';
+        const isApproved = c.status === 'APPROVED';
+        const isPending = c.status === 'PENDING_REVIEW';
+        const videoSrc = c.shorts_clip_path ? `/outputs/viral_clips/${c.clip_id}_shorts.mp4` : '';
+
+        return `
+          <article class="bg-surface-low border border-border hover:border-amber-500/40 rounded-3xl p-5 transition-all space-y-4 flex flex-col justify-between">
+            <div class="space-y-3">
+              <!-- Top Header: Title & Badges -->
+              <div class="flex items-start justify-between gap-3">
+                <div class="space-y-1">
+                  <div class="flex items-center gap-2 flex-wrap">
+                    <span class="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold uppercase ${c.platform === 'youtube' ? 'bg-red-500/20 text-red-400' : 'bg-purple-500/20 text-purple-400'}">
+                      ${c.platform}
+                    </span>
+                    <span class="text-xs font-mono text-text-subtle">Peak @ ${Math.round(c.peak_time || 0)}s</span>
+                    ${c.quality_check_passed !== undefined && c.quality_check_passed !== null ? (
+                      c.quality_check_passed ?
+                        '<span class="px-2 py-0.5 rounded-md bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 font-mono text-[10px] font-bold flex items-center gap-1"><span class="material-symbols-outlined text-[13px]">verified</span> QC Pass</span>' :
+                        `<span class="px-2 py-0.5 rounded-md bg-amber-500/15 border border-amber-500/30 text-amber-400 font-mono text-[10px] font-bold flex items-center gap-1" title="${(c.quality_issues||[]).join(', ')}"><span class="material-symbols-outlined text-[13px]">warning</span> QC Review</span>`
+                    ) : ''}
+                  </div>
+                  <input id="inputTitle_${c.clip_id}" type="text" value="${c.title || 'Viral Short'}"
+                    class="w-full bg-surface border border-border focus:border-amber-400 px-3 py-1.5 rounded-xl font-headline font-bold text-white text-sm focus:outline-none" />
+                </div>
+
+                <!-- Virality Confidence Pill -->
+                <div class="px-3 py-1 rounded-full bg-surface-card border ${conf >= 80 ? 'border-tertiary text-tertiary' : 'border-amber-400 text-amber-400'} font-mono text-xs font-extrabold flex items-center gap-1.5 shadow-sm whitespace-nowrap">
+                  <span class="w-2 h-2 rounded-full ${conf >= 80 ? 'bg-tertiary' : 'bg-amber-400'} animate-pulse"></span>
+                  <span>${conf}% Virality</span>
+                </div>
+              </div>
+
+              <!-- Why Selected (Predictive AI Rationale) -->
+              ${c.why_selected ? `
+                <div class="bg-amber-500/10 border border-amber-500/20 rounded-2xl p-3 space-y-1 text-xs">
+                  <div class="flex items-center gap-1.5 text-[10px] font-mono uppercase tracking-wider text-amber-300 font-bold">
+                    <span class="material-symbols-outlined text-[15px]">psychology</span>
+                    <span>Why Selected (Predictive AI)</span>
+                  </div>
+                  <p class="text-text-main text-xs font-sans">${c.why_selected}</p>
+                </div>
+              ` : ''}
+
+              <!-- Video Player Preview -->
+              ${videoSrc ? `
+                <div class="relative rounded-2xl overflow-hidden bg-black aspect-[9/16] max-h-[360px] mx-auto border border-border">
+                  <video src="${videoSrc}" controls class="w-full h-full object-contain" preload="metadata"></video>
+                </div>
+              ` : `
+                <div class="p-6 text-center bg-surface rounded-2xl border border-border text-xs text-text-subtle font-mono">
+                  Clip rendered at: ${c.shorts_clip_path || c.raw_clip_path}
+                </div>
+              `}
+
+              <!-- Subtitle & Transcript Snippet -->
+              <div class="bg-surface p-3 rounded-2xl border border-border space-y-1 text-xs">
+                <div class="text-[10px] text-text-subtle font-mono uppercase">Detected Dialogue (Faster-Whisper):</div>
+                <p class="text-text-muted italic line-clamp-2 font-serif">"${c.transcript || 'Speech detected and subtitled with kinetic karaoke electric yellow highlights.'}"</p>
+              </div>
+
+              <!-- Source Attribution Link -->
+              <div class="flex items-center justify-between gap-2 text-xs text-text-subtle font-mono">
+                <div class="flex items-center gap-1.5 truncate max-w-xs">
+                  <span>Source:</span>
+                  <a href="${c.stream_url}" target="_blank" class="text-secondary hover:underline truncate">${c.stream_url}</a>
+                </div>
+                ${(c.views_count || c.likes_count) ? `
+                  <div class="flex items-center gap-2 text-amber-300 font-bold">
+                    <span>👁️ ${(c.views_count || 0).toLocaleString()}</span>
+                    <span>👍 ${(c.likes_count || 0).toLocaleString()}</span>
+                  </div>
+                ` : ''}
+              </div>
+            </div>
+
+            <!-- Copyright & Publishing Footer Gate -->
+            <div class="pt-3 border-t border-border/60 space-y-3">
+              ${isPublished ? `
+                <div class="p-3 bg-tertiary/10 border border-tertiary/30 rounded-2xl flex items-center justify-between text-xs">
+                  <div class="flex items-center gap-2 text-tertiary font-bold">
+                    <span class="material-symbols-outlined text-[18px]">verified</span>
+                    <span>PUBLISHED TO YOUTUBE SHORTS</span>
+                  </div>
+                  ${c.youtube_video_id ? `
+                    <a href="https://www.youtube.com/shorts/${c.youtube_video_id}" target="_blank" class="text-secondary font-mono hover:underline">View Short</a>
+                  ` : ''}
+                </div>
+              ` : `
+                <!-- Copyright & Rights Gate Checkbox -->
+                <label class="flex items-start gap-2.5 text-xs text-text-muted cursor-pointer select-none">
+                  <input id="cbCopyright_${c.clip_id}" type="checkbox" class="mt-0.5 rounded border-border text-secondary focus:ring-0" />
+                  <span>I confirm I hold broadcasting rights, permission, or fair-use commentary license to publish this highlight.</span>
+                </label>
+
+                <!-- Actions -->
+                <div class="flex items-center gap-2">
+                  <button onclick="approveAndPublishShort('${c.clip_id}')"
+                    class="flex-1 py-2.5 px-4 rounded-xl bg-gradient-to-r from-tertiary to-emerald-600 hover:brightness-110 text-black font-headline text-xs font-bold shadow-md transition-all flex items-center justify-center gap-1.5">
+                    <span class="material-symbols-outlined text-[17px]">publish</span>
+                    <span>1-Click Approve & Publish to Shorts</span>
+                  </button>
+
+                  <button onclick="rejectShort('${c.clip_id}')" title="Reject / Dismiss"
+                    class="p-2.5 rounded-xl bg-surface hover:bg-surface-high text-text-subtle hover:text-red-400 border border-border transition-colors">
+                    <span class="material-symbols-outlined text-[17px]">close</span>
+                  </button>
+
+                  <a href="${videoSrc}" download class="p-2.5 rounded-xl bg-surface hover:bg-surface-high text-text-subtle hover:text-white border border-border transition-colors" title="Download Short MP4">
+                    <span class="material-symbols-outlined text-[17px]">download</span>
+                  </a>
+                </div>
+              `}
+            </div>
+          </article>
+        `;
+      }).join('');
+    }
+
+    async function approveAndPublishShort(clipId) {
+      const cb = document.getElementById(`cbCopyright_${clipId}`);
+      if (!cb || !cb.checked) {
+        showToast('Please check the copyright permission confirmation checkbox first.', 'info');
+        return;
+      }
+
+      const inputTitle = document.getElementById(`inputTitle_${clipId}`);
+      const customTitle = inputTitle ? inputTitle.value : null;
+
+      showToast('Publishing viral Short to YouTube...', 'info');
+      try {
+        const res = await fetch(`/api/trend-hunter/clips/${encodeURIComponent(clipId)}/approve-and-publish`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ copyright_confirmed: true, title: customTitle })
+        });
+        if (!res.ok) throw new Error(await res.text());
+        const data = await res.json();
+        showToast(data.message || 'Viral Short published to YouTube Shorts!', 'success');
+        refreshReviewQueue();
+      } catch (err) {
+        showToast('Publishing failed: ' + err.message, 'error');
+      }
+    }
+
+    async function rejectShort(clipId) {
+      const reason = prompt('Optional rejection feedback (helps AI learn):', 'Not engaging') || 'user_dismissed';
+      try {
+        const res = await fetch(`/api/trend-hunter/clips/${encodeURIComponent(clipId)}/reject`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ reason })
+        });
+        if (res.ok) {
+          showToast('Clip dismissed & feedback logged for AI weight adaptation.', 'info');
+          refreshReviewQueue();
+        }
+      } catch (e) {
+        showToast('Failed to reject clip: ' + e.message, 'error');
+      }
+    }
+
+    async function changeAutomationLevel(mode) {
+      try {
+        const res = await fetch('/api/trend-hunter/settings/automation-level', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ mode })
+        });
+        if (res.ok) {
+          const data = await res.json();
+          showToast(`Automation workflow set to: ${data.automation_level || mode}`, 'info');
+        }
+      } catch(e) {
+        showToast('Failed to update automation mode', 'error');
+      }
+    }
+
+    async function toggleChannelPriority(channelId, priority) {
+      try {
+        const res = await fetch(`/api/trend-hunter/channels/${encodeURIComponent(channelId)}/priority`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ priority })
+        });
+        if (res.ok) {
+          showToast(`Channel priority updated to Level ${priority}`, 'info');
+          loadTrendHunterData();
+        }
+      } catch(e) {
+        showToast('Failed to update channel priority', 'error');
+      }
+    }
+
+    async function syncYouTubeAnalytics() {
+      showToast('Syncing YouTube analytics for published clips...', 'info');
+      try {
+        const res = await fetch('/api/trend-hunter/analytics/sync', { method: 'POST' });
+        if (res.ok) {
+          const data = await res.json();
+          showToast(`Analytics synced: ${data.updated_clips_count || 0} clips updated.`, 'success');
+          refreshReviewQueue();
+        } else {
+          showToast('Analytics sync returned non-OK status.', 'warning');
+        }
+      } catch(e) {
+        showToast('Error syncing analytics: ' + e.message, 'error');
+      }
+    }
+
+    // Polling interval
+    setInterval(() => {
+      if (currentBatchId) selectBatch(currentBatchId);
+    }, 8000);
+
+    // Initial Boot
+    loadServerInfo();
+    checkYoutubeStatus();
+    loadBatches();
+    pollChatEngineStatus();
+    loadTrendHunterData();
+
+  </script>
+</body>
+</html>

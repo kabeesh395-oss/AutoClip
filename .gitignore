@@ -4,3 +4,7 @@ __pycache__/
 *.py[cod]
 data/
 client_secrets.json
+.gradle/
+android-app/.gradle/
+android-app/**/build/
+android-app/.kotlin/

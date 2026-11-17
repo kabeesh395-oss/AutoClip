@@ -1,39 +1,137 @@
 from __future__ import annotations
 
+import io
+import json
+import logging
+import os
+import re
 import shutil
+import socket
 import sqlite3
 import threading
 import time
 import uuid
+import zipfile
 from contextlib import contextmanager
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
 import yt_dlp
-from fastapi import BackgroundTasks, FastAPI, File, Form, HTTPException, UploadFile
-from fastapi.responses import FileResponse
+from fastapi import BackgroundTasks, Body, FastAPI, File, Form, HTTPException, Request, UploadFile
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse, Response
 from fastapi.staticfiles import StaticFiles
 
-from .pipeline import process
-from .youtube import connect_youtube, upload_public_video, youtube_status
+from .batch_manager import (
+    _now_ist_iso,
+    add_source_to_batch,
+    create_batch,
+    create_creator,
+    delete_batch,
+    generate_batch_schedule_slots,
+    get_batch,
+    get_batch_report,
+    get_creator,
+    get_db,
+    init_batch_tables,
+    list_batches,
+    list_creators,
+    list_game_policies,
+    register_game_policy,
+    set_clip_approval,
+)
+from .batch_worker import get_batch_worker
+from .pipeline import Candidate, generate_viral_intelligence, process
+from .youtube import connect_youtube, schedule_youtube_video, upload_public_video, youtube_status
 
 ROOT = Path(__file__).resolve().parents[1]
 DATA = ROOT / "data"
 UPLOADS = DATA / "uploads"
 OUTPUTS = DATA / "outputs"
 STATIC = Path(__file__).parent / "static"
-SCHEDULE_DB = DATA / "autoclip.sqlite3"
+SCHEDULE_DB = Path(os.getenv("AUTOCLIP_DB_PATH", str(DATA / "autoclip.sqlite3")))
+LOG_FILE = DATA / "server.log"
 IST = timezone(timedelta(hours=5, minutes=30))
 for folder in (UPLOADS, OUTPUTS):
     folder.mkdir(parents=True, exist_ok=True)
+init_batch_tables()
 
-app = FastAPI(title="AutoClip AI", version="0.2.0")
+
+def _output_rel_url(path_val: str | Path | None) -> str:
+    if not path_val:
+        return ""
+    p = Path(path_val)
+    if not p.is_absolute():
+        p = (ROOT / p).resolve()
+    else:
+        p = p.resolve()
+    outputs_res = OUTPUTS.resolve()
+    try:
+        rel = p.relative_to(outputs_res).as_posix()
+        return f"/outputs/{rel}"
+    except ValueError:
+        return f"/outputs/{p.name}"
+
+# Configure persistent file logger
+logger = logging.getLogger("autoclip")
+logger.setLevel(logging.INFO)
+if not any(isinstance(h, logging.FileHandler) for h in logger.handlers):
+    fh = logging.FileHandler(str(LOG_FILE), encoding="utf-8")
+    fh.setFormatter(logging.Formatter("[%(asctime)s] [%(levelname)s] %(message)s", datefmt="%Y-%m-%d %H:%M:%S"))
+    logger.addHandler(fh)
+    logging.getLogger("uvicorn").addHandler(fh)
+    logging.getLogger("uvicorn.access").addHandler(fh)
+
+app = FastAPI(title="AutoClip AI", version="0.3.0")
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+
+@app.middleware("http")
+async def log_requests_middleware(request: Request, call_next):
+    client_ip = request.client.host if request.client else "unknown"
+    start_time = time.time()
+    logger.info("--> %s %s from %s", request.method, request.url.path, client_ip)
+    try:
+        response = await call_next(request)
+        duration_ms = (time.time() - start_time) * 1000
+        logger.info("<-- %s %s [%s] in %.1fms", request.method, request.url.path, response.status_code, duration_ms)
+        return response
+    except Exception as exc:
+        duration_ms = (time.time() - start_time) * 1000
+        logger.error("<-- ERROR %s %s: %s (%.1fms)", request.method, request.url.path, exc, duration_ms, exc_info=True)
+        raise
+
+
 app.mount("/outputs", StaticFiles(directory=OUTPUTS), name="outputs")
 app.mount("/static", StaticFiles(directory=STATIC), name="static")
 jobs: dict[str, dict[str, Any]] = {}
 lock = threading.Lock()
 _scheduler_started = False
+
+
+@app.get("/api/server-logs")
+def api_get_server_logs():
+    """Returns recent server logs with secrets and sensitive tokens masked."""
+    if not LOG_FILE.exists():
+        return {"logs": [], "count": 0}
+    lines = LOG_FILE.read_text(encoding="utf-8", errors="ignore").splitlines()[-200:]
+    masked_lines = []
+    for line in lines:
+        clean = re.sub(
+            r'(client_secret|access_token|refresh_token|password)[\'"]?\s*[:=]\s*[\'"][^\'"]+[\'"]',
+            r'\1="[REDACTED]"',
+            line,
+            flags=re.I,
+        )
+        masked_lines.append(clean)
+    return {"logs": masked_lines, "count": len(masked_lines)}
 
 
 @contextmanager
@@ -72,12 +170,74 @@ def _now_ist() -> datetime:
 
 @app.get("/")
 def home():
-    return FileResponse(STATIC / "index.html")
+    return FileResponse(
+        STATIC / "index.html",
+        headers={
+            "Cache-Control": "no-cache, no-store, must-revalidate",
+            "Pragma": "no-cache",
+            "Expires": "0",
+        },
+    )
+
+
+def _get_local_ip() -> str:
+    try:
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        s.settimeout(0.5)
+        s.connect(("8.8.8.8", 80))
+        ip = s.getsockname()[0]
+        s.close()
+        return ip
+    except Exception:
+        return "127.0.0.1"
 
 
 @app.get("/api/health")
 def health():
-    return {"status": "ok", "app": "AutoClip AI", "mode": "local-first"}
+    return {"status": "ok", "app": "AutoClip AI", "mode": "local-first", "ip": _get_local_ip()}
+
+
+@app.get("/api/server-info")
+def get_server_info():
+    local_ip = _get_local_ip()
+    apk_file = ROOT / "android-app" / "app" / "build" / "outputs" / "apk" / "debug" / "app-debug.apk"
+    apk_exists = apk_file.exists() and apk_file.stat().st_size > 0
+    apk_size_mb = round(apk_file.stat().st_size / (1024 * 1024), 1) if apk_exists else 0
+    yt_stat = youtube_status()
+
+    return {
+        "app_name": "AutoClip AI",
+        "version": "1.0.0",
+        "local_ip": local_ip,
+        "port": 8765,
+        "web_url": f"http://{local_ip}:8765",
+        "apk_available": apk_exists,
+        "apk_size_mb": apk_size_mb,
+        "apk_download_url": f"/api/download-apk",
+        "youtube_connected": yt_stat.get("connected", False),
+        "timezone": "Asia/Kolkata",
+        "default_batch_config": {
+            "videos_per_day": 3,
+            "schedule_days": 3,
+            "batch_target": 9,
+            "daily_shorts": 2,
+            "daily_long": 1,
+            "manual_approval_required": True,
+            "slots": ["12:00 PM (Short)", "04:00 PM (Short)", "07:00 PM (Long)"]
+        }
+    }
+
+
+@app.get("/api/download-apk")
+def download_apk():
+    apk_path = ROOT / "android-app" / "app" / "build" / "outputs" / "apk" / "debug" / "app-debug.apk"
+    if not apk_path.exists() or apk_path.stat().st_size == 0:
+        raise HTTPException(404, "Android APK not found. Build the project first.")
+    return FileResponse(
+        str(apk_path),
+        media_type="application/vnd.android.package-archive",
+        filename="AutoClip-AI-debug.apk"
+    )
 
 
 @app.get("/api/youtube/status")
@@ -85,10 +245,23 @@ def get_youtube_status():
     return youtube_status()
 
 
-@app.post("/api/youtube/connect")
-def youtube_connect():
+@app.get("/api/youtube/auth-url")
+def get_youtube_auth_url(redirect_uri: str | None = None):
     try:
-        return connect_youtube()
+        from .youtube import get_authorization_url
+        url = get_authorization_url(redirect_uri=redirect_uri or "http://127.0.0.1:8088/")
+        stat = youtube_status()
+        return {"auth_url": url, **stat}
+    except Exception as exc:
+        raise HTTPException(400, str(exc)) from exc
+
+
+@app.post("/api/youtube/connect")
+def youtube_connect(payload: dict | None = None):
+    try:
+        code = payload.get("code") or payload.get("authorization_code") if payload else None
+        red_uri = payload.get("redirect_uri") if payload else None
+        return connect_youtube(authorization_code=code, redirect_uri=red_uri)
     except Exception as exc:
         raise HTTPException(400, str(exc)) from exc
 
@@ -134,7 +307,7 @@ def _download_url(job_id: str, url: str, mode: str) -> Path:
     target.mkdir(parents=True, exist_ok=True)
     options = {"outtmpl": str(target / "%(title).80s-%(id)s.%(ext)s"),
                "format": "bv*+ba/b", "merge_output_format": "mp4",
-               "noplaylist": True, "quiet": True, "no_warnings": True}
+               "noplaylist": True, "quiet": True, "no_warnings": True, "color": "no_color"}
     if mode == "live":
         options["live_from_start"] = True
         options["wait_for_video"] = 10
@@ -294,9 +467,27 @@ def start_scheduler():
     global _scheduler_started
     with _db():
         pass
+    init_batch_tables()
+    try:
+        from .trend_hunter import init_trend_tables, trend_hunter_service
+        init_trend_tables()
+        trend_hunter_service.initialize_default_channels()
+    except Exception as exc:
+        logger.warning("Trend hunter init warning: %s", exc)
+    get_batch_worker().start()
     if not _scheduler_started:
         threading.Thread(target=_scheduled_worker, name="autoclip-scheduler", daemon=True).start()
         _scheduler_started = True
+
+
+@app.on_event("shutdown")
+def stop_background_services():
+    try:
+        from .trend_hunter import trend_hunter_service
+        trend_hunter_service.job_queue.stop_worker()
+        trend_hunter_service.ranking_scheduler.stop()
+    except Exception:
+        pass
 
 
 @app.get("/api/jobs/{job_id}")
@@ -306,3 +497,983 @@ def get_job(job_id: str):
         if not job:
             raise HTTPException(404, "Job not found. Jobs are stored in memory until the app restarts.")
         return dict(job)
+
+
+@app.get("/api/history")
+def get_history():
+    with lock:
+        return {"jobs": list(jobs.values())[::-1]}
+
+
+@app.post("/api/clips/{job_id}/{clip_id}/regenerate-metadata")
+def regenerate_clip_metadata(job_id: str, clip_id: int):
+    with lock:
+        job = jobs.get(job_id)
+        if not job:
+            raise HTTPException(404, "Job not found.")
+        target_clip = None
+        for c in job.get("clips", []):
+            if c.get("id") == clip_id:
+                target_clip = c
+                break
+        if not target_clip:
+            raise HTTPException(404, "Clip not found.")
+
+        # Re-run viral intelligence generator
+        cand = Candidate(
+            start=float(target_clip.get("start", 0)),
+            end=float(target_clip.get("end", 0)),
+            title=str(target_clip.get("title", "")),
+            reason=str(target_clip.get("reason", "")),
+            score=float(target_clip.get("score", 0)),
+            transcript=str(target_clip.get("description", target_clip.get("title", "")))
+        )
+        intel = generate_viral_intelligence(cand)
+        target_clip["hook"] = intel.get("hook", target_clip.get("hook"))
+        target_clip["titles"] = intel.get("titles", target_clip.get("titles", []))
+        target_clip["youtube_title"] = target_clip["titles"][0] if target_clip["titles"] else target_clip.get("youtube_title")
+        target_clip["description"] = intel.get("description", target_clip.get("description"))
+        target_clip["youtube_description"] = target_clip["description"]
+        target_clip["hashtags"] = intel.get("hashtags", target_clip.get("hashtags", []))
+        target_clip["youtube_tags"] = [t.lstrip("#") for t in target_clip["hashtags"]]
+        target_clip["scene_intelligence"] = intel.get("scene_intelligence", target_clip.get("scene_intelligence"))
+
+        # Persist updated clips.json
+        job_dir = OUTPUTS / job_id
+        if job_dir.exists():
+            (job_dir / "clips.json").write_text(json.dumps(job["clips"], ensure_ascii=False, indent=2), encoding="utf-8")
+
+        return target_clip
+
+
+@app.put("/api/clips/{job_id}/{clip_id}")
+def update_clip(job_id: str, clip_id: int, payload: dict = Body(...)):
+    with lock:
+        job = jobs.get(job_id)
+        if not job:
+            raise HTTPException(404, "Job not found.")
+        target_clip = None
+        for c in job.get("clips", []):
+            if c.get("id") == clip_id:
+                target_clip = c
+                break
+        if not target_clip:
+            raise HTTPException(404, "Clip not found.")
+
+        if "title" in payload:
+            target_clip["title"] = payload["title"]
+        if "youtube_title" in payload:
+            target_clip["youtube_title"] = payload["youtube_title"]
+        if "description" in payload:
+            target_clip["description"] = payload["description"]
+            target_clip["youtube_description"] = payload["description"]
+        if "hashtags" in payload and isinstance(payload["hashtags"], list):
+            target_clip["hashtags"] = payload["hashtags"]
+            target_clip["youtube_tags"] = [t.lstrip("#") for t in payload["hashtags"]]
+        if "hook" in payload and isinstance(payload["hook"], dict):
+            target_clip["hook"] = payload["hook"]
+        if "subtitles_srt" in payload:
+            target_clip["subtitles_srt"] = payload["subtitles_srt"]
+            job_dir = OUTPUTS / job_id
+            if job_dir.exists():
+                srt_path = job_dir / Path(target_clip.get("subtitle_url", "")).name
+                if srt_path.name:
+                    srt_path.write_text(payload["subtitles_srt"], encoding="utf-8")
+
+        job_dir = OUTPUTS / job_id
+        if job_dir.exists():
+            (job_dir / "clips.json").write_text(json.dumps(job["clips"], ensure_ascii=False, indent=2), encoding="utf-8")
+
+        return target_clip
+
+
+# ==========================================
+# BATCH PRODUCTION API ENDPOINTS (FR-01 to FR-15)
+# ==========================================
+
+@app.post("/api/batches")
+def api_create_batch(payload: dict = Body(...)):
+    name = str(payload.get("name", "New Batch")).strip()
+    target_per_day = int(payload.get("target_videos_per_day", 3))
+    days = int(payload.get("schedule_days", 3))
+    shorts = int(payload.get("daily_shorts", 2))
+    longs = int(payload.get("daily_long", 1))
+    lang = str(payload.get("language", "en"))
+    model = str(payload.get("whisper_model", "small"))
+    return create_batch(
+        name=name,
+        target_videos_per_day=target_per_day,
+        schedule_days=days,
+        daily_shorts=shorts,
+        daily_long=longs,
+        language=lang,
+        whisper_model=model,
+    )
+
+
+@app.get("/api/batches")
+def api_list_batches():
+    return {"batches": list_batches()}
+
+
+@app.get("/api/batches/{batch_id}")
+def api_get_batch(batch_id: str):
+    batch = get_batch(batch_id)
+    if not batch:
+        raise HTTPException(404, "Batch not found")
+    return batch
+
+
+@app.delete("/api/batches/{batch_id}")
+def api_delete_batch(batch_id: str):
+    batch = get_batch(batch_id)
+    if not batch:
+        raise HTTPException(404, "Batch not found")
+    delete_batch(batch_id)
+    return {"status": "deleted", "batch_id": batch_id}
+
+
+@app.post("/api/batches/{batch_id}/sources")
+def api_add_source(batch_id: str, payload: dict = Body(...)):
+    url = str(payload.get("source_url", "")).strip()
+    if not url:
+        raise HTTPException(400, "source_url is required")
+    creator_id = payload.get("creator_id")
+    game_name = payload.get("game_name")
+    title = payload.get("title", "")
+    try:
+        return add_source_to_batch(batch_id, url, creator_id=creator_id, game_name=game_name, title=title)
+    except ValueError as exc:
+        raise HTTPException(400, str(exc))
+
+
+@app.post("/api/batches/{batch_id}/upload-source")
+async def api_upload_batch_source(
+    batch_id: str,
+    file: UploadFile = File(...),
+    creator_id: str = Form(""),
+    game_name: str = Form("")
+):
+    batch = get_batch(batch_id)
+    if not batch:
+        raise HTTPException(404, "Batch not found")
+    dest_dir = UPLOADS / f"batch_{batch_id}"
+    dest_dir.mkdir(parents=True, exist_ok=True)
+    suffix = Path(file.filename or "source.mp4").suffix.lower()
+    if suffix not in {".mp4", ".mkv", ".mov", ".webm", ".avi", ".m4v"}:
+        raise HTTPException(400, "Unsupported video format.")
+    dest_file = dest_dir / f"{uuid.uuid4().hex[:8]}_{file.filename}"
+    with dest_file.open("wb") as out:
+        shutil.copyfileobj(file.file, out)
+    return add_source_to_batch(
+        batch_id=batch_id,
+        source_url=str(dest_file),
+        creator_id=creator_id or None,
+        game_name=game_name or None,
+        title=Path(file.filename or "video").stem,
+        file_path=str(dest_file)
+    )
+
+
+@app.post("/api/creators")
+def api_create_creator(payload: dict = Body(...)):
+    name = str(payload.get("name", "")).strip()
+    channel = str(payload.get("channel_url", "")).strip()
+    if not name or not channel:
+        raise HTTPException(400, "name and channel_url are required")
+    status = str(payload.get("permission_status", "ACTIVE"))
+    comm = str(payload.get("commercial_use_status", "ALLOWED"))
+    return create_creator(name, channel, permission_status=status, commercial_use_status=comm)
+
+
+@app.get("/api/creators")
+def api_list_creators():
+    return {"creators": list_creators()}
+
+
+@app.post("/api/game-policies")
+def api_register_game_policy(payload: dict = Body(...)):
+    game_name = str(payload.get("game_name", "")).strip()
+    if not game_name:
+        raise HTTPException(400, "game_name is required")
+    publisher = str(payload.get("publisher_name", "")).strip()
+    policy = str(payload.get("commercial_policy", "VERIFIED")).strip()
+    monetization = int(payload.get("monetization_allowed", 1))
+    notes = str(payload.get("notes", "")).strip()
+    return register_game_policy(
+        game_name=game_name,
+        publisher_name=publisher,
+        commercial_policy=policy,
+        monetization_allowed=monetization,
+        notes=notes
+    )
+
+
+@app.get("/api/game-policies")
+def api_list_game_policies():
+    return {"game_policies": list_game_policies()}
+
+
+@app.put("/api/clips/{clip_id}/approval")
+def api_set_clip_approval(clip_id: str, payload: dict = Body(...)):
+    status = str(payload.get("approval_status", "APPROVED")).upper()
+    try:
+        return set_clip_approval(clip_id, status)
+    except ValueError as exc:
+        raise HTTPException(400, str(exc))
+
+
+@app.post("/api/batches/{batch_id}/schedule")
+def api_schedule_batch(batch_id: str, payload: dict = Body(default={})):
+    start_date = payload.get("start_date")
+    try:
+        slots = generate_batch_schedule_slots(batch_id, start_date_str=start_date)
+        return {"scheduled_slots": slots, "count": len(slots)}
+    except ValueError as exc:
+        raise HTTPException(400, str(exc))
+
+
+@app.get("/api/batches/{batch_id}/report")
+def api_batch_report(batch_id: str):
+    try:
+        return get_batch_report(batch_id)
+    except ValueError as exc:
+        raise HTTPException(404, str(exc))
+
+
+@app.get("/api/batches/{batch_id}/download-zip")
+def api_download_batch_zip(batch_id: str):
+    batch = get_batch(batch_id)
+    if not batch:
+        raise HTTPException(404, "Batch not found")
+
+    with get_db() as conn:
+        approved_clips = conn.execute("""
+            SELECT * FROM clips WHERE batch_id = ? AND approval_status = 'APPROVED'
+            ORDER BY created_at ASC
+        """, (batch_id,)).fetchall()
+
+    if not approved_clips:
+        raise HTTPException(400, "No approved clips found in this batch to export. Approve clips first.")
+
+    buffer = io.BytesIO()
+    with zipfile.ZipFile(buffer, "w", zipfile.ZIP_DEFLATED) as zip_file:
+        metadata_export = []
+        for idx, c in enumerate(approved_clips, 1):
+            clip_dict = dict(c)
+            p = Path(clip_dict["output_path"]) if clip_dict.get("output_path") else None
+            format_prefix = "SHORT" if clip_dict["format"] == "SHORT" else "LONG"
+            safe_slug = re.sub(r"[^a-zA-Z0-9_-]+", "_", clip_dict["title"])[:35] or f"clip_{idx}"
+
+            arc_video_name = f"{idx:02d}_{format_prefix}_{safe_slug}.mp4"
+            if p and p.exists():
+                zip_file.write(str(p), arcname=arc_video_name)
+
+                srt_p = p.with_suffix(".srt")
+                if srt_p.exists():
+                    zip_file.write(str(srt_p), arcname=f"{idx:02d}_{format_prefix}_{safe_slug}.srt")
+
+            try:
+                titles = json.loads(clip_dict.get("titles_json") or "[]")
+            except Exception:
+                titles = [clip_dict["title"]]
+            try:
+                tags = json.loads(clip_dict.get("hashtags_json") or "[]")
+            except Exception:
+                tags = []
+            try:
+                hook = json.loads(clip_dict.get("hook_json") or "{}")
+            except Exception:
+                hook = {}
+
+            metadata_export.append({
+                "index": idx,
+                "format": clip_dict["format"],
+                "video_file": arc_video_name,
+                "title": clip_dict["title"],
+                "titles": titles,
+                "description": clip_dict["description"],
+                "hashtags": tags,
+                "hook": hook,
+                "duration": clip_dict["duration"]
+            })
+
+        zip_file.writestr("batch_metadata.json", json.dumps(metadata_export, ensure_ascii=False, indent=2))
+
+    buffer.seek(0)
+    zip_filename = f"batch_{batch_id}_approved_clips.zip"
+    return Response(
+        content=buffer.getvalue(),
+        media_type="application/zip",
+        headers={"Content-Disposition": f'attachment; filename="{zip_filename}"'}
+    )
+
+
+@app.get("/api/batches/{batch_id}/clips")
+def api_get_batch_clips(batch_id: str):
+    batch = get_batch(batch_id)
+    if not batch:
+        raise HTTPException(404, "Batch not found")
+    formatted_clips = []
+    for c in batch.get("clips", []):
+        clip_copy = dict(c)
+        try:
+            clip_copy["titles"] = json.loads(c.get("titles_json") or "[]")
+        except Exception:
+            clip_copy["titles"] = [c.get("title", "")]
+        try:
+            clip_copy["hashtags"] = json.loads(c.get("hashtags_json") or "[]")
+        except Exception:
+            clip_copy["hashtags"] = []
+        try:
+            clip_copy["hook"] = json.loads(c.get("hook_json") or "{}")
+        except Exception:
+            clip_copy["hook"] = {}
+        try:
+            clip_copy["scene_intelligence"] = json.loads(c.get("scene_intelligence_json") or "{}")
+        except Exception:
+            clip_copy["scene_intelligence"] = {}
+        try:
+            clip_copy["improvement_tips"] = json.loads(c.get("improvement_tips_json") or "[]")
+        except Exception:
+            clip_copy["improvement_tips"] = []
+        if c.get("output_path"):
+            p = Path(c["output_path"])
+            clip_copy["video_url"] = _output_rel_url(p)
+            srt_p = p.with_suffix(".srt")
+            if srt_p.exists():
+                clip_copy["subtitle_url"] = _output_rel_url(srt_p)
+                try:
+                    clip_copy["subtitles_srt"] = srt_p.read_text(encoding="utf-8")
+                except Exception:
+                    clip_copy["subtitles_srt"] = ""
+            ass_p = p.with_suffix(".ass")
+            if ass_p.exists():
+                clip_copy["ass_url"] = _output_rel_url(ass_p)
+        formatted_clips.append(clip_copy)
+    return {"clips": formatted_clips, "count": len(formatted_clips)}
+
+
+@app.get("/api/clips/{clip_id}")
+def api_get_clip(clip_id: str):
+    with get_db() as conn:
+        row = conn.execute("SELECT * FROM clips WHERE id = ?", (clip_id,)).fetchone()
+        if not row:
+            raise HTTPException(404, "Clip not found")
+        clip = dict(row)
+        try:
+            clip["titles"] = json.loads(clip.get("titles_json") or "[]")
+        except Exception:
+            clip["titles"] = [clip.get("title", "")]
+        try:
+            clip["hashtags"] = json.loads(clip.get("hashtags_json") or "[]")
+        except Exception:
+            clip["hashtags"] = []
+        try:
+            clip["hook"] = json.loads(clip.get("hook_json") or "{}")
+        except Exception:
+            clip["hook"] = {}
+        try:
+            clip["scene_intelligence"] = json.loads(clip.get("scene_intelligence_json") or "{}")
+        except Exception:
+            clip["scene_intelligence"] = {}
+        try:
+            clip["improvement_tips"] = json.loads(clip.get("improvement_tips_json") or "[]")
+        except Exception:
+            clip["improvement_tips"] = []
+        if clip.get("output_path"):
+            p = Path(clip["output_path"])
+            clip["video_url"] = _output_rel_url(p)
+            srt_p = p.with_suffix(".srt")
+            if srt_p.exists():
+                clip["subtitle_url"] = _output_rel_url(srt_p)
+                try:
+                    clip["subtitles_srt"] = srt_p.read_text(encoding="utf-8")
+                except Exception:
+                    clip["subtitles_srt"] = ""
+            ass_p = p.with_suffix(".ass")
+            if ass_p.exists():
+                clip["ass_url"] = _output_rel_url(ass_p)
+        return clip
+
+
+@app.post("/api/clips/{clip_id}/re-render")
+def api_rerender_clip(clip_id: str, payload: dict = Body(default={})):
+    """Re-render clip with custom Opus Clip layout and kinetic subtitle styling."""
+    layout = str(payload.get("layout", "FIT_BLUR")).upper()
+    caption_style = str(payload.get("caption_style", "KINETIC_YELLOW")).upper()
+    show_hook_header = bool(payload.get("show_hook_header", True))
+
+    with get_db() as conn:
+        row = conn.execute("SELECT * FROM clips WHERE id = ?", (clip_id,)).fetchone()
+        if not row:
+            raise HTTPException(404, "Clip not found")
+        clip = dict(row)
+
+        source_row = conn.execute("SELECT * FROM sources WHERE id = ?", (clip["source_id"],)).fetchone()
+        if not source_row:
+            raise HTTPException(404, "Source video not found")
+        source = dict(source_row)
+
+    source_path = Path(source.get("file_path") or source.get("source_url") or "")
+    if not source_path.exists():
+        cand_path = UPLOADS / f"batch_{clip['batch_id']}" / f"source_{clip['source_id']}.mp4"
+        if cand_path.exists():
+            source_path = cand_path
+        else:
+            raise HTTPException(400, "Source media file is not available locally for re-rendering.")
+
+    output_path = Path(clip["output_path"]) if clip.get("output_path") else (OUTPUTS / f"batch_{clip['batch_id']}" / f"{clip_id}.mp4")
+
+    from .pipeline import Candidate, Segment, render
+    c_cand = Candidate(
+        start=float(clip["start_time"]),
+        end=float(clip["end_time"]),
+        title=clip["title"],
+        reason="Opus Re-render",
+        score=float(clip.get("hook_score") or 90.0),
+        transcript=clip.get("transcript") or ""
+    )
+    rows = [Segment(c_cand.start, c_cand.end, c_cand.transcript)]
+
+    try:
+        render(
+            source=source_path,
+            rows=rows,
+            clip=c_cand,
+            target=output_path,
+            layout=layout,
+            caption_style=caption_style,
+            show_hook_header=show_hook_header
+        )
+    except Exception as exc:
+        raise HTTPException(500, f"Re-render failed: {str(exc)}")
+
+    with get_db() as conn:
+        conn.execute("""
+            UPDATE clips SET layout = ?, caption_style = ?, output_path = ? WHERE id = ?
+        """, (layout, caption_style, str(output_path), clip_id))
+
+    return {
+        "status": "re-rendered",
+        "clip_id": clip_id,
+        "layout": layout,
+        "caption_style": caption_style,
+        "video_url": _output_rel_url(output_path)
+    }
+
+
+@app.post("/api/batches/{batch_id}/start")
+def api_start_batch(batch_id: str):
+    batch = get_batch(batch_id)
+    if not batch:
+        raise HTTPException(404, "Batch not found")
+    worker = get_batch_worker()
+    worker.start()
+    return {"status": "started", "batch_id": batch_id, "jobs_count": len(batch.get("jobs", []))}
+
+
+@app.post("/api/jobs/{job_id}/retry")
+def api_retry_job(job_id: str):
+    with get_db() as conn:
+        row = conn.execute("SELECT * FROM jobs WHERE id = ?", (job_id,)).fetchone()
+        if not row:
+            raise HTTPException(404, "Job not found")
+        conn.execute("UPDATE jobs SET status = 'QUEUED', retry_count = retry_count + 1, error_message = '', stage_message = 'Retried by user', updated_at = ? WHERE id = ?",
+                     (_now_ist_iso(), job_id))
+    return {"status": "QUEUED", "job_id": job_id}
+
+
+@app.post("/api/jobs/{job_id}/cancel")
+def api_cancel_job(job_id: str):
+    with get_db() as conn:
+        row = conn.execute("SELECT * FROM jobs WHERE id = ?", (job_id,)).fetchone()
+        if not row:
+            raise HTTPException(404, "Job not found")
+        conn.execute("UPDATE jobs SET status = 'CANCELLED', stage_message = 'Cancelled by user', updated_at = ? WHERE id = ?",
+                     (_now_ist_iso(), job_id))
+    return {"status": "CANCELLED", "job_id": job_id}
+
+
+@app.post("/api/clips/{clip_id}/publish-youtube")
+def api_publish_clip_to_youtube(clip_id: str, payload: dict = Body(default={})):
+    yt_stat = youtube_status()
+    if not yt_stat.get("connected"):
+        raise HTTPException(400, "YouTube account is not connected. Please connect your YouTube channel first.")
+
+    with get_db() as conn:
+        clip_row = conn.execute("SELECT * FROM clips WHERE id = ?", (clip_id,)).fetchone()
+
+    if not clip_row:
+        raise HTTPException(404, "Clip not found")
+
+    clip = dict(clip_row)
+    video_p = Path(clip["output_path"]) if clip.get("output_path") else None
+    if not video_p or not video_p.exists():
+        raise HTTPException(400, f"Rendered video file missing at {video_p}")
+
+    privacy = payload.get("privacy", "public")
+    tags = []
+    try:
+        tags = json.loads(clip.get("hashtags_json") or "[]")
+    except Exception:
+        tags = []
+    tags = [str(t).lstrip("#") for t in tags]
+
+    try:
+        from .youtube import upload_public_video
+        res = upload_public_video(
+            video_path=video_p,
+            title=clip.get("title", video_p.stem),
+            description=clip.get("description", "Created with AutoClip AI"),
+            tags=tags,
+            privacy_status=privacy,
+        )
+        with get_db() as conn:
+            conn.execute("""
+                UPDATE clips
+                SET approval_status = 'APPROVED',
+                    youtube_video_id = ?,
+                    youtube_url = ?
+                WHERE id = ?
+            """, (res["video_id"], res["url"], clip_id))
+        return {
+            "success": True,
+            "video_id": res["video_id"],
+            "url": res["url"],
+            "title": clip.get("title"),
+            "clip_id": clip_id,
+        }
+    except Exception as exc:
+        raise HTTPException(500, f"YouTube upload failed: {exc}") from exc
+
+
+@app.post("/api/batches/{batch_id}/commit-cloud-schedule")
+def api_commit_cloud_schedule(batch_id: str):
+    yt_stat = youtube_status()
+    if not yt_stat.get("connected"):
+        raise HTTPException(400, "YouTube account is not connected. Connect YouTube channel first before scheduling uploads.")
+
+    batch = get_batch(batch_id)
+    if not batch:
+        raise HTTPException(404, "Batch not found")
+
+    with get_db() as conn:
+        scheduled_slots = conn.execute("""
+            SELECT s.*, c.output_path, c.title, c.description, c.hashtags_json, c.approval_status
+            FROM schedules s
+            JOIN clips c ON s.clip_id = c.id
+            WHERE s.batch_id = ? AND s.status = 'PENDING'
+            ORDER BY s.scheduled_at ASC
+        """, (batch_id,)).fetchall()
+
+    if not scheduled_slots:
+        try:
+            generate_batch_schedule_slots(batch_id)
+        except Exception:
+            pass
+        with get_db() as conn:
+            scheduled_slots = conn.execute("""
+                SELECT s.*, c.output_path, c.title, c.description, c.hashtags_json, c.approval_status
+                FROM schedules s
+                JOIN clips c ON s.clip_id = c.id
+                WHERE s.batch_id = ? AND s.status = 'PENDING'
+                ORDER BY s.scheduled_at ASC
+            """, (batch_id,)).fetchall()
+
+    if not scheduled_slots:
+        raise HTTPException(400, "No approved clips found in this batch to schedule. Approve clips in Studio first.")
+
+    committed_results = []
+    for slot in scheduled_slots:
+        if slot["approval_status"] != "APPROVED":
+            continue
+        video_p = Path(slot["output_path"])
+        if not video_p.exists():
+            continue
+        try:
+            tags = json.loads(slot.get("hashtags_json") or "[]")
+        except Exception:
+            tags = []
+        tags = [str(t).lstrip("#") for t in tags]
+
+        try:
+            res = schedule_youtube_video(
+                video_path=video_p,
+                title=slot["title"],
+                description=slot["description"],
+                publish_at_iso=slot["scheduled_at"],
+                tags=tags
+            )
+            with get_db() as conn:
+                conn.execute("""
+                    UPDATE schedules
+                    SET status = 'COMMITTED', youtube_video_id = ?
+                    WHERE id = ?
+                """, (res["video_id"], slot["id"]))
+            committed_results.append({
+                "slot_id": slot["id"],
+                "video_id": res["video_id"],
+                "url": res["url"],
+                "scheduled_at": slot["scheduled_at"]
+            })
+        except Exception as exc:
+            with get_db() as conn:
+                conn.execute("UPDATE schedules SET error_message = ? WHERE id = ?", (str(exc), slot["id"]))
+
+    return {"status": "committed", "count": len(committed_results), "slots": committed_results}
+
+
+@app.post("/api/worker/poll")
+def api_worker_poll(payload: dict = Body(default={})):
+    """Worker polling endpoint for local cloud rendering worker."""
+    worker_id = str(payload.get("worker_id", "pc-local-worker"))
+    batch_id = payload.get("batch_id")
+    with get_db() as conn:
+        if batch_id:
+            job = conn.execute("""
+                SELECT j.*, s.source_url, s.title as source_title, b.language, b.whisper_model, b.daily_shorts, b.daily_long
+                FROM jobs j
+                JOIN sources s ON j.source_id = s.id
+                JOIN batches b ON j.batch_id = b.id
+                WHERE j.status = 'QUEUED' AND j.batch_id = ?
+                ORDER BY j.updated_at ASC
+                LIMIT 1
+            """, (batch_id,)).fetchone()
+        else:
+            job = conn.execute("""
+                SELECT j.*, s.source_url, s.title as source_title, b.language, b.whisper_model, b.daily_shorts, b.daily_long
+                FROM jobs j
+                JOIN sources s ON j.source_id = s.id
+                JOIN batches b ON j.batch_id = b.id
+                WHERE j.status = 'QUEUED'
+                ORDER BY j.updated_at ASC
+                LIMIT 1
+            """).fetchone()
+        if not job:
+            return {"has_job": False}
+        job_dict = dict(job)
+        conn.execute("UPDATE jobs SET status = 'PROCESSING', stage_message = 'Rendering on Worker', updated_at = ? WHERE id = ?",
+                     (_now_ist_iso(), job_dict["id"]))
+        return {"has_job": True, "job": job_dict}
+
+
+@app.post("/api/worker/jobs/{job_id}/complete")
+def api_worker_complete_job(job_id: str, payload: dict = Body(default={})):
+    """Worker reports rendered clips completed."""
+    clips = payload.get("clips", [])
+    now = _now_ist_iso()
+    with get_db() as conn:
+        for c in clips:
+            clip_id = f"clip_{uuid.uuid4().hex[:8]}"
+            conn.execute("""
+                INSERT INTO clips (
+                    id, batch_id, source_id, format, start_time, end_time, duration,
+                    hook_score, virality_grade, flow_score, engagement_score, trend_score,
+                    layout, caption_style, why_viral, improvement_tips_json,
+                    title, titles_json, description, hashtags_json, hook_json,
+                    output_path, approval_status, created_at
+                ) VALUES (
+                    ?, ?, ?, ?, ?, ?, ?,
+                    ?, ?, ?, ?, ?,
+                    ?, ?, ?, ?,
+                    ?, ?, ?, ?, ?,
+                    ?, 'PENDING', ?
+                )
+            """, (
+                clip_id, c.get("batch_id"), c.get("source_id"), c.get("format", "SHORT"),
+                float(c.get("start_time", 0.0)), float(c.get("end_time", 15.0)), float(c.get("duration", 15.0)),
+                float(c.get("hook_score", 85.0)), c.get("virality_grade", "A"), float(c.get("flow_score", 80.0)),
+                float(c.get("engagement_score", 85.0)), float(c.get("trend_score", 80.0)),
+                c.get("layout", "FIT_BLUR"), c.get("caption_style", "KINETIC_YELLOW"), c.get("why_viral", ""),
+                json.dumps(c.get("improvement_tips", [])),
+                c.get("title", "Clip"), json.dumps(c.get("titles", [c.get("title", "Clip")])),
+                c.get("description", ""), json.dumps(c.get("hashtags", [])), json.dumps(c.get("hook", {})),
+                c.get("local_video_path", ""), now
+            ))
+        conn.execute("UPDATE jobs SET status = 'COMPLETED', progress = 100, stage_message = 'Completed', completed_at = ?, updated_at = ? WHERE id = ?",
+                     (now, now, job_id))
+    return {"status": "COMPLETED", "job_id": job_id, "clips_created": len(clips)}
+
+
+# =============================================================================
+# CHAT ACTIVITY SPIKE DETECTION ENGINE ENDPOINTS
+# =============================================================================
+
+@app.get("/api/chat-engine/status")
+def api_chat_engine_status():
+    from .chat_engine import chat_engine_service
+    return chat_engine_service.get_status()
+
+
+@app.get("/api/chat-engine/spikes")
+def api_chat_engine_spikes(session_id: str | None = None, limit: int = 50):
+    from .chat_engine import chat_engine_service, list_chat_spikes
+    return {
+        "session_id": session_id or chat_engine_service.active_session_id,
+        "spikes": list_chat_spikes(session_id=session_id or chat_engine_service.active_session_id, limit=limit)
+    }
+
+
+@app.post("/api/chat-engine/start")
+async def api_chat_engine_start(payload: dict = Body(default={})):
+    from .chat_engine import SpikeDetectorConfig, chat_engine_service
+
+    stream_target = str(payload.get("stream_target") or payload.get("channel") or "shroud").strip()
+    source_type = str(payload.get("source_type") or "twitch").lower()
+    video_path = payload.get("video_path")
+    sensitivity = payload.get("sensitivity", "medium")
+
+    config = SpikeDetectorConfig(
+        sensitivity=sensitivity,
+        pre_roll_seconds=float(payload.get("pre_roll_seconds", 20.0)),
+        post_roll_seconds=float(payload.get("post_roll_seconds", 40.0)),
+        min_confidence=float(payload.get("min_confidence", 55.0)),
+    )
+
+    status = await chat_engine_service.start_session(
+        stream_target=stream_target,
+        source_type=source_type,
+        video_path=video_path,
+        config=config,
+    )
+    return {"status": "started", "session": status}
+
+
+@app.post("/api/chat-engine/stop")
+async def api_chat_engine_stop():
+    from .chat_engine import chat_engine_service
+    status = await chat_engine_service.stop_session()
+    return {"status": "stopped", "session": status}
+
+
+@app.post("/api/chat-engine/simulate")
+async def api_chat_engine_simulate(payload: dict = Body(default={})):
+    """Triggers an automated simulated stream chat session with hype bursts for demo and testing."""
+    from .chat_engine import SpikeDetectorConfig, chat_engine_service
+    video_path = payload.get("video_path")
+    if not video_path:
+        sample_p = DATA / "sample_real_video.mp4"
+        if sample_p.exists():
+            video_path = str(sample_p)
+
+    config = SpikeDetectorConfig(
+        sensitivity="high",
+        min_mps_threshold=2.0,
+        pre_roll_seconds=5.0,
+        post_roll_seconds=15.0,
+    )
+
+    status = await chat_engine_service.start_session(
+        stream_target="simulated_hype_stream",
+        source_type="simulated",
+        video_path=video_path,
+        config=config,
+    )
+    return {"status": "simulation_started", "session": status}
+
+
+# =============================================================================
+# TREND HUNTER & VIRAL CLIP EXTRACTION ENGINE ENDPOINTS
+# =============================================================================
+
+@app.get("/api/trend-hunter/status")
+def api_trend_hunter_status():
+    from .trend_hunter import trend_hunter_service
+    return trend_hunter_service.get_global_status()
+
+
+@app.get("/api/trend-hunter/channels")
+def api_trend_hunter_channels():
+    from .trend_hunter import trend_hunter_service
+    return {"channels": trend_hunter_service.list_tracked_channels()}
+
+
+@app.post("/api/trend-hunter/channels")
+def api_trend_hunter_add_channel(payload: dict = Body(...)):
+    from .trend_hunter import trend_hunter_service
+    query = str(payload.get("query") or payload.get("channel") or "").strip()
+    platform = payload.get("platform")
+    if not query:
+        raise HTTPException(400, "Channel query or URL is required.")
+    ch = trend_hunter_service.add_channel(query, platform=platform)
+    return {"status": "added", "channel": ch}
+
+
+@app.delete("/api/trend-hunter/channels/{channel_id}")
+def api_trend_hunter_delete_channel(channel_id: str):
+    from .trend_hunter import trend_hunter_service
+    success = trend_hunter_service.remove_channel(channel_id)
+    if not success:
+        raise HTTPException(404, f"Channel not found: {channel_id}")
+    return {"status": "deleted", "channel_id": channel_id}
+
+
+@app.post("/api/trend-hunter/channels/search")
+def api_trend_hunter_search(payload: dict = Body(...)):
+    from .trend_hunter import trend_hunter_service
+    query = str(payload.get("query") or "").strip()
+    platform = payload.get("platform")
+    results = trend_hunter_service.search_channels(query, platform=platform)
+    return {"results": results}
+
+
+@app.post("/api/trend-hunter/monitor/start")
+async def api_trend_hunter_start_monitor(payload: dict = Body(...)):
+    from .trend_hunter import TrendHunterConfig, trend_hunter_service
+    channel_id = str(payload.get("channel_id") or "").strip()
+    if not channel_id:
+        raise HTTPException(400, "channel_id is required.")
+
+    cfg = TrendHunterConfig(
+        sensitivity=payload.get("sensitivity", "medium"),
+        pre_roll_seconds=float(payload.get("pre_roll_seconds", 20.0)),
+        post_roll_seconds=float(payload.get("post_roll_seconds", 40.0)),
+        min_confidence=float(payload.get("min_confidence", 60.0)),
+        layout=payload.get("layout", "9:16"),
+        caption_style=payload.get("caption_style", "KINETIC_YELLOW"),
+        auto_publish=bool(payload.get("auto_publish", False)),
+    )
+
+    video_fallback = payload.get("source_video_fallback")
+    fallback_path = Path(video_fallback) if video_fallback else None
+    is_simulation = bool(payload.get("is_simulation", False))
+
+    try:
+        session = await trend_hunter_service.start_monitoring(
+            channel_id=channel_id,
+            config=cfg,
+            source_video_fallback=fallback_path,
+            is_simulation=is_simulation,
+        )
+        return {"status": "monitoring_started", "session": session}
+    except Exception as exc:
+        raise HTTPException(500, f"Failed to start monitoring: {exc}")
+
+
+@app.post("/api/trend-hunter/monitor/stop")
+async def api_trend_hunter_stop_monitor(payload: dict = Body(...)):
+    from .trend_hunter import trend_hunter_service
+    channel_id = str(payload.get("channel_id") or "").strip()
+    if not channel_id:
+        raise HTTPException(400, "channel_id is required.")
+    session = await trend_hunter_service.stop_monitoring(channel_id)
+    return {"status": "monitoring_stopped", "session": session}
+
+
+@app.get("/api/trend-hunter/review-queue")
+def api_trend_hunter_review_queue(status: str | None = None, limit: int = 50):
+    from .trend_hunter import trend_hunter_service
+    clips = trend_hunter_service.list_review_queue(status=status, limit=limit)
+    return {"clips": clips}
+
+
+@app.post("/api/trend-hunter/clips/{clip_id}/approve-and-publish")
+def api_trend_hunter_publish(clip_id: str, payload: dict = Body(default={})):
+    from .trend_hunter import trend_hunter_service
+    copyright_confirmed = bool(payload.get("copyright_confirmed", False))
+    if not copyright_confirmed:
+        raise HTTPException(400, "You must confirm copyright / permission rights before publishing.")
+    try:
+        res = trend_hunter_service.approve_and_publish_clip(clip_id, copyright_confirmed=True)
+        return res
+    except Exception as exc:
+        raise HTTPException(500, f"Publishing failed: {exc}")
+
+
+@app.post("/api/trend-hunter/channels/{channel_id}/priority")
+def api_trend_hunter_channel_priority(channel_id: str, payload: dict = Body(...)):
+    from .trend_hunter import trend_hunter_service
+    priority = int(payload.get("priority", 1))
+    success = trend_hunter_service.set_channel_priority(channel_id, priority)
+    return {"status": "updated" if success else "failed", "channel_id": channel_id, "priority": priority}
+
+
+@app.post("/api/trend-hunter/settings/automation-level")
+def api_trend_hunter_set_automation_level(payload: dict = Body(...)):
+    from .trend_hunter import trend_hunter_service
+    mode = str(payload.get("automation_level") or payload.get("mode") or "MANUAL").upper()
+    if mode not in ("MANUAL", "SEMI_AUTO", "FULL_AUTO"):
+        raise HTTPException(400, "Invalid automation_level. Choose MANUAL, SEMI_AUTO, or FULL_AUTO.")
+    saved_mode = trend_hunter_service.set_automation_level(mode)
+    return {"status": "updated", "automation_level": saved_mode}
+
+
+@app.post("/api/trend-hunter/analytics/sync")
+def api_trend_hunter_sync_analytics():
+    from .trend_hunter import trend_hunter_service
+    count = trend_hunter_service.sync_performance_analytics()
+    return {"status": "synced", "updated_clips_count": count}
+
+
+@app.get("/api/trend-hunter/learning/weights")
+def api_trend_hunter_get_learning_weights():
+    from .trend_hunter import trend_hunter_service
+    return {"weights": trend_hunter_service.feedback_learner.current_weights.to_dict()}
+
+
+@app.post("/api/trend-hunter/clips/{clip_id}/reject")
+def api_trend_hunter_reject(clip_id: str, payload: dict = Body(default={})):
+    from .trend_hunter import trend_hunter_service
+    reason = payload.get("reason", "")
+    success = trend_hunter_service.reject_clip(clip_id, reason=reason)
+    return {"status": "rejected" if success else "failed", "clip_id": clip_id}
+
+
+@app.post("/api/trend-hunter/clips/{clip_id}/update")
+def api_trend_hunter_update_clip(clip_id: str, payload: dict = Body(...)):
+    from .trend_hunter import trend_hunter_service
+    title = payload.get("title")
+    description = payload.get("description")
+    success = trend_hunter_service.update_clip_metadata(clip_id, title=title, description=description)
+    return {"status": "updated" if success else "failed", "clip_id": clip_id}
+
+
+@app.post("/api/trend-hunter/simulate")
+async def api_trend_hunter_simulate(payload: dict = Body(default={})):
+    """Triggers an automated simulated live monitoring session with synthetic hype burst."""
+    from .trend_hunter import TrendHunterConfig, trend_hunter_service
+    channel_name = payload.get("channel_name", "IShowSpeed")
+    platform = payload.get("platform", "youtube")
+    channel_id = f"ch_sim_{channel_name.lower()}"
+
+    # Ensure channel exists
+    channel = trend_hunter_service.storage.get_channel(channel_id)
+    if not channel:
+        from .trend_hunter import ChannelProfile
+        channel = ChannelProfile(
+            id=channel_id,
+            channel_name=channel_name,
+            platform=platform,
+            channel_url=f"https://www.{platform}.com/@{channel_name}",
+            is_live=True,
+            current_viewers=85000,
+            demand_score=94.5,
+            stream_title=f"🔴 {channel_name} LIVE STREAM HYPES",
+            category="IRL & Gaming",
+        )
+        trend_hunter_service.storage.upsert_channel(channel)
+
+    video_path = payload.get("video_path")
+    fallback_p = Path(video_path) if video_path else None
+    if not fallback_p:
+        cand_p = DATA / "sample_real_video.mp4"
+        if cand_p.exists():
+            fallback_p = cand_p
+
+    cfg = TrendHunterConfig(
+        sensitivity="high",
+        pre_roll_seconds=float(payload.get("pre_roll_seconds", 5.0)),
+        post_roll_seconds=float(payload.get("post_roll_seconds", 15.0)),
+        min_confidence=50.0,
+    )
+
+    session = await trend_hunter_service.start_monitoring(
+        channel_id=channel_id,
+        config=cfg,
+        source_video_fallback=fallback_p,
+        is_simulation=True,
+    )
+    return {"status": "simulation_started", "session": session}
+
+
