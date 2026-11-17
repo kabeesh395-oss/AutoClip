@@ -345,26 +345,136 @@
     <!-- TAB 3: SCHEDULE (3-Day Release Timetable)                               -->
     <!-- ======================================================================= -->
     <div id="tab-schedule" class="tab-content hidden space-y-6">
-      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-surface-low p-5 rounded-2xl border border-border">
+      <!-- Autonomous Production & Content Calendar Header -->
+      <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-4 bg-surface-low p-5 rounded-2xl border border-border shadow-xl">
         <div>
-          <h2 class="font-headline text-xl font-extrabold text-white">3-Day Content Release Schedule</h2>
-          <p class="text-xs text-text-muted mt-0.5">Schedules 3 videos per day (2 Shorts + 1 Long Form) with optimal viral release timing in Asia/Kolkata.</p>
+          <div class="flex items-center gap-2">
+            <h2 class="font-headline text-xl font-extrabold text-white">Autonomous Production & Content Calendar</h2>
+            <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-secondary/20 text-secondary border border-secondary/30">Phase 3</span>
+          </div>
+          <p class="text-xs text-text-muted mt-1">Multi-platform autonomous scheduling, YouTube Shorts, Long-form, & Instagram Reels (Meta Graph API) with safety rights gate.</p>
         </div>
-        <button id="btnCommitSchedule" class="bg-gradient-to-r from-tertiary to-secondary hover:brightness-110 text-white font-headline text-xs font-bold px-5 py-2.5 rounded-xl shadow-lg transition-all text-center">
-          Commit Approved to YouTube Schedule
-        </button>
+        <div class="flex flex-wrap items-center gap-2">
+          <button onclick="syncProductionAnalytics()" class="bg-surface-card hover:bg-surface-high text-white text-xs font-semibold px-3.5 py-2 rounded-xl border border-border flex items-center gap-1.5 transition-all">
+            <span class="material-symbols-outlined text-[16px] text-tertiary">sync</span>
+            <span>Sync Performance</span>
+          </button>
+          <button onclick="openInstagramModal()" class="bg-surface-card hover:bg-surface-high text-white text-xs font-semibold px-3.5 py-2 rounded-xl border border-border flex items-center gap-1.5 transition-all">
+            <span class="material-symbols-outlined text-[16px] text-pink-400">photo_camera</span>
+            <span>Instagram Setup</span>
+          </button>
+          <button onclick="openProductionRulesModal()" class="bg-surface-card hover:bg-surface-high text-white text-xs font-semibold px-3.5 py-2 rounded-xl border border-border flex items-center gap-1.5 transition-all">
+            <span class="material-symbols-outlined text-[16px] text-amber-400">tune</span>
+            <span>Rules & Limits</span>
+          </button>
+          <button onclick="openProductionScheduleModal()" class="bg-gradient-to-r from-primary to-secondary hover:brightness-110 text-white font-headline text-xs font-bold px-4 py-2 rounded-xl shadow-lg transition-all flex items-center gap-1.5">
+            <span class="material-symbols-outlined text-[16px]">add_circle</span>
+            <span>Schedule Clip</span>
+          </button>
+        </div>
       </div>
 
-      <div class="bg-surface-low border border-border rounded-2xl overflow-hidden shadow-xl">
-        <div class="overflow-x-auto custom-scroll">
+      <!-- Production KPI & Platform Status Strip -->
+      <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+        <div class="bg-surface-low border border-border p-4 rounded-xl">
+          <span class="text-[10px] uppercase font-bold text-text-muted">Scheduled</span>
+          <div id="prodStatScheduled" class="text-xl font-extrabold text-secondary mt-0.5">0</div>
+          <span class="text-[10px] text-text-subtle">Ready in calendar</span>
+        </div>
+        <div class="bg-surface-low border border-border p-4 rounded-xl">
+          <span class="text-[10px] uppercase font-bold text-text-muted">Published</span>
+          <div id="prodStatPublished" class="text-xl font-extrabold text-emerald-400 mt-0.5">0</div>
+          <span class="text-[10px] text-text-subtle">Live on platforms</span>
+        </div>
+        <div class="bg-surface-low border border-border p-4 rounded-xl">
+          <span class="text-[10px] uppercase font-bold text-text-muted">Avg Engagement</span>
+          <div id="prodStatEngagement" class="text-xl font-extrabold text-tertiary mt-0.5">0.0%</div>
+          <span class="text-[10px] text-text-subtle">Likes + Comments / Views</span>
+        </div>
+        <div class="bg-surface-low border border-border p-4 rounded-xl">
+          <span class="text-[10px] uppercase font-bold text-text-muted">YouTube Shorts & Long</span>
+          <div id="prodYtPill" class="mt-1 flex items-center gap-1.5 text-xs font-bold text-text-subtle">
+            <span class="w-2 h-2 rounded-full bg-yellow-500 animate-pulse"></span>
+            <span>Checking...</span>
+          </div>
+          <span class="text-[10px] text-text-subtle">OAuth Desktop Client</span>
+        </div>
+        <div class="bg-surface-low border border-border p-4 rounded-xl">
+          <span class="text-[10px] uppercase font-bold text-text-muted">Instagram Reels</span>
+          <div id="prodIgPill" class="mt-1 flex items-center gap-1.5 text-xs font-bold text-text-subtle">
+            <span class="w-2 h-2 rounded-full bg-yellow-500 animate-pulse"></span>
+            <span>Checking...</span>
+          </div>
+          <span class="text-[10px] text-text-subtle">Meta Graph API v19.0</span>
+        </div>
+      </div>
+
+      <!-- Filters & View Options -->
+      <div class="flex flex-wrap items-center justify-between gap-3 bg-surface-low/80 p-3 rounded-xl border border-border">
+        <div class="flex flex-wrap items-center gap-2">
+          <span class="text-xs text-text-muted font-medium">Filter Platform:</span>
+          <button onclick="setCalPlatformFilter('all')" class="cal-filter-plat px-3 py-1 rounded-lg text-xs font-semibold bg-surface-high text-white border border-border" data-plat="all">All</button>
+          <button onclick="setCalPlatformFilter('youtube_shorts')" class="cal-filter-plat px-3 py-1 rounded-lg text-xs font-medium text-text-muted hover:text-white" data-plat="youtube_shorts">YouTube Shorts</button>
+          <button onclick="setCalPlatformFilter('youtube_longform')" class="cal-filter-plat px-3 py-1 rounded-lg text-xs font-medium text-text-muted hover:text-white" data-plat="youtube_longform">YouTube Long-Form</button>
+          <button onclick="setCalPlatformFilter('instagram_reels')" class="cal-filter-plat px-3 py-1 rounded-lg text-xs font-medium text-text-muted hover:text-white" data-plat="instagram_reels">Instagram Reels</button>
+        </div>
+        <div class="flex items-center gap-2">
+          <span class="text-xs text-text-muted font-medium">Status:</span>
+          <select id="calStatusSelect" onchange="fetchProductionCalendar()" class="bg-surface-card text-white text-xs rounded-lg border border-border px-2.5 py-1">
+            <option value="">All Statuses</option>
+            <option value="scheduled">Scheduled</option>
+            <option value="published">Published</option>
+            <option value="failed">Failed</option>
+            <option value="cancelled">Cancelled</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- Dynamic Calendar Slots Grid -->
+      <div id="prodCalendarContainer" class="space-y-4">
+        <!-- Rendered dynamically by renderProductionCalendar() -->
+        <div class="p-8 text-center bg-surface-low rounded-2xl border border-border text-text-muted">
+          <span class="material-symbols-outlined text-4xl mb-2 text-text-subtle">calendar_today</span>
+          <p class="text-sm font-medium">Loading content calendar...</p>
+        </div>
+      </div>
+
+      <!-- Post-Publication Performance Intelligence & AI Feedback Loop -->
+      <div class="bg-surface-low border border-border rounded-2xl p-5 shadow-xl space-y-3">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+          <div>
+            <h3 class="font-headline text-sm font-extrabold text-white flex items-center gap-2">
+              <span class="material-symbols-outlined text-tertiary text-[18px]">insights</span>
+              <span>Post-Publication Intelligence & Feedback Loop</span>
+            </h3>
+            <p class="text-[11px] text-text-muted">Verified analytics feed back directly into Trend Hunter adaptive thresholds to refine future viral moment detection.</p>
+          </div>
+          <span class="px-2.5 py-1 rounded-full text-[10px] font-mono font-bold bg-primary/20 text-primary border border-primary/30">
+            Learner Active
+          </span>
+        </div>
+        <div id="prodAnalyticsContent" class="text-xs text-text-subtle">
+          No published clips synced yet. Sync performance to stream verified engagement signals.
+        </div>
+      </div>
+
+      <!-- Collapsible Legacy 3-Day Batch Schedule (Maintains Backward Compatibility) -->
+      <details class="group bg-surface-low/50 border border-border rounded-2xl p-4">
+        <summary class="flex items-center justify-between cursor-pointer text-xs font-semibold text-text-muted hover:text-white">
+          <span>Legacy Batch Release Timetable (Project Slots)</span>
+          <button id="btnCommitSchedule" class="bg-surface-card hover:bg-surface-high text-white text-[11px] font-bold px-3 py-1 rounded-lg border border-border">
+            Commit Batch to YouTube
+          </button>
+        </summary>
+        <div class="mt-4 overflow-x-auto custom-scroll">
           <table class="w-full text-left text-xs min-w-[550px]">
             <thead class="bg-surface border-b border-border text-text-muted font-headline uppercase text-[10px]">
               <tr>
-                <th class="p-3.5">Day / Slot</th>
-                <th class="p-3.5">Format</th>
-                <th class="p-3.5">Scheduled Release Time</th>
-                <th class="p-3.5">Assigned Viral Clip</th>
-                <th class="p-3.5">Status</th>
+                <th class="p-3">Day / Slot</th>
+                <th class="p-3">Format</th>
+                <th class="p-3">Scheduled Release Time</th>
+                <th class="p-3">Assigned Viral Clip</th>
+                <th class="p-3">Status</th>
               </tr>
             </thead>
             <tbody id="scheduleTableBody" class="divide-y divide-border font-mono text-[11px]">
@@ -372,7 +482,7 @@
             </tbody>
           </table>
         </div>
-      </div>
+      </details>
     </div>
 
     <!-- ======================================================================= -->
@@ -976,6 +1086,207 @@
     </div>
   </div>
 
+  <!-- Production Schedule Modal (Phase 3) -->
+  <div id="modalProductionSchedule" class="fixed inset-0 z-50 bg-black/85 backdrop-blur-md hidden flex items-center justify-center p-4">
+    <div class="bg-surface-low border border-border rounded-2xl p-5 sm:p-6 max-w-lg w-full space-y-4 shadow-2xl relative max-h-[90vh] overflow-y-auto">
+      <button onclick="closeProductionScheduleModal()" class="absolute top-4 right-4 text-text-subtle hover:text-white p-1 rounded-lg">
+        <span class="material-symbols-outlined">close</span>
+      </button>
+      <div class="flex items-center gap-3">
+        <div class="w-10 h-10 rounded-xl bg-secondary/20 border border-secondary/30 flex items-center justify-center">
+          <span class="material-symbols-outlined text-secondary text-[22px]">calendar_add_on</span>
+        </div>
+        <div>
+          <h3 class="font-headline text-base sm:text-lg font-bold text-white">Schedule Clip Release</h3>
+          <p class="text-xs text-text-muted">Target YouTube Shorts, Long-form, or Instagram Reels.</p>
+        </div>
+      </div>
+
+      <form id="formProductionSchedule" onsubmit="submitProductionSchedule(event)" class="space-y-3.5 pt-1">
+        <div>
+          <label class="block text-xs font-headline text-text-muted mb-1">Select Content Item / Clip</label>
+          <select id="schedItemSelect" required class="w-full bg-surface-card text-white text-xs rounded-xl border border-border px-3.5 py-2.5">
+            <option value="">Select a processed clip...</option>
+          </select>
+        </div>
+
+        <div>
+          <label class="block text-xs font-headline text-text-muted mb-1">Target Platform & Format</label>
+          <div class="grid grid-cols-3 gap-2">
+            <label class="flex flex-col items-center gap-1.5 p-2.5 rounded-xl border border-border bg-surface-card cursor-pointer hover:border-secondary transition-all">
+              <input type="radio" name="schedPlatform" value="youtube_shorts" checked class="text-secondary focus:ring-0">
+              <span class="text-[11px] font-bold text-white">YT Shorts</span>
+              <span class="text-[9px] text-text-muted">9:16 Vertical</span>
+            </label>
+            <label class="flex flex-col items-center gap-1.5 p-2.5 rounded-xl border border-border bg-surface-card cursor-pointer hover:border-secondary transition-all">
+              <input type="radio" name="schedPlatform" value="youtube_longform" class="text-secondary focus:ring-0">
+              <span class="text-[11px] font-bold text-white">YT Long-Form</span>
+              <span class="text-[9px] text-text-muted">16:9 Landscape</span>
+            </label>
+            <label class="flex flex-col items-center gap-1.5 p-2.5 rounded-xl border border-border bg-surface-card cursor-pointer hover:border-secondary transition-all">
+              <input type="radio" name="schedPlatform" value="instagram_reels" class="text-secondary focus:ring-0">
+              <span class="text-[11px] font-bold text-white">IG Reels</span>
+              <span class="text-[9px] text-text-muted">9:16 Vertical</span>
+            </label>
+          </div>
+        </div>
+
+        <div id="schedTitleContainer" class="space-y-1.5 hidden">
+          <label class="block text-xs font-headline text-text-muted">Choose AI Title Option</label>
+          <div id="schedTitleOptions" class="space-y-1.5"></div>
+        </div>
+
+        <div>
+          <div class="flex items-center justify-between mb-1">
+            <label class="text-xs font-headline text-text-muted">Scheduled Release Time (UTC / ISO)</label>
+            <button type="button" onclick="fillSuggestedSlot()" class="text-[11px] text-secondary hover:underline">
+              ⚡ Suggest Optimal Slot
+            </button>
+          </div>
+          <input type="datetime-local" id="schedTimeInput" required class="w-full bg-surface-card text-white text-xs font-mono rounded-xl border border-border px-3.5 py-2">
+        </div>
+
+        <div>
+          <label class="block text-xs font-headline text-text-muted mb-1">Initial Privacy Status</label>
+          <select id="schedPrivacySelect" class="w-full bg-surface-card text-white text-xs rounded-xl border border-border px-3.5 py-2">
+            <option value="private" selected>Private (Safest - review before public)</option>
+            <option value="unlisted">Unlisted</option>
+            <option value="public">Public</option>
+          </select>
+        </div>
+
+        <!-- Mandatory Rights Confirmation Guardrail -->
+        <div class="p-3 bg-amber-500/10 border border-amber-500/30 rounded-xl space-y-1.5">
+          <label class="flex items-start gap-2.5 cursor-pointer">
+            <input type="checkbox" id="schedRightsCheckbox" required class="mt-0.5 rounded text-amber-500 focus:ring-0">
+            <span class="text-xs text-white leading-tight font-medium">
+              I verify and confirm rights & ownership to publish this clip to public platforms.
+            </span>
+          </label>
+          <p class="text-[10px] text-amber-300/80 pl-6 leading-relaxed">
+            Safety Gate: Autonomous and manual uploads require confirmed permissions to prevent unauthorized republishing.
+          </p>
+        </div>
+
+        <div class="flex items-center gap-2 pt-1">
+          <button type="submit" class="flex-1 bg-gradient-to-r from-primary to-secondary hover:brightness-110 text-white font-headline text-xs font-bold py-2.5 rounded-xl shadow-md transition-all">
+            Add to Release Calendar
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Instagram Graph API Connection Modal -->
+  <div id="modalInstagramConnect" class="fixed inset-0 z-50 bg-black/85 backdrop-blur-md hidden flex items-center justify-center p-4">
+    <div class="bg-surface-low border border-pink-500/40 rounded-2xl p-5 sm:p-6 max-w-md w-full space-y-4 shadow-2xl relative">
+      <button onclick="closeInstagramModal()" class="absolute top-4 right-4 text-text-subtle hover:text-white p-1 rounded-lg">
+        <span class="material-symbols-outlined">close</span>
+      </button>
+
+      <div class="flex items-center gap-3">
+        <div class="w-10 h-10 rounded-xl bg-pink-500/20 border border-pink-500/30 flex items-center justify-center">
+          <span class="material-symbols-outlined text-pink-400 text-[24px]">photo_camera</span>
+        </div>
+        <div>
+          <h3 class="font-headline text-base sm:text-lg font-bold text-white">Instagram Reels Setup</h3>
+          <p class="text-xs text-text-muted">Official Meta Graph API v19.0 Integration.</p>
+        </div>
+      </div>
+
+      <div class="bg-surface p-3.5 rounded-xl border border-border space-y-2 text-xs text-text-muted">
+        <div class="font-headline font-semibold text-white flex items-center gap-1.5">
+          <span class="material-symbols-outlined text-secondary text-[16px]">info</span>
+          <span>Requirements:</span>
+        </div>
+        <ul class="list-disc pl-4 space-y-1 text-text-subtle text-[11px] leading-relaxed">
+          <li>Instagram Professional or Creator account connected to a Facebook Page.</li>
+          <li>Meta App with <code class="text-white bg-surface-card px-1 py-0.5 rounded">instagram_basic</code> & <code class="text-white bg-surface-card px-1 py-0.5 rounded">instagram_content_publish</code> permissions.</li>
+          <li>Long-lived Page Access Token.</li>
+        </ul>
+      </div>
+
+      <form id="formInstagramConnect" onsubmit="submitInstagramConnect(event)" class="space-y-3">
+        <div>
+          <label class="block text-xs font-headline text-text-muted mb-1">Instagram Business Account User ID</label>
+          <input type="text" id="igUserIdInput" placeholder="e.g. 17841400000000000" required class="w-full bg-surface-card text-white text-xs font-mono rounded-xl border border-border px-3.5 py-2">
+        </div>
+        <div>
+          <label class="block text-xs font-headline text-text-muted mb-1">Meta Graph API Page Access Token</label>
+          <input type="password" id="igAccessTokenInput" placeholder="EAAB..." required class="w-full bg-surface-card text-white text-xs font-mono rounded-xl border border-border px-3.5 py-2">
+        </div>
+        <button type="submit" class="w-full bg-gradient-to-r from-pink-600 to-purple-600 hover:brightness-110 text-white font-headline text-xs font-bold py-2.5 rounded-xl shadow-md transition-all">
+          Verify & Save Instagram Credentials
+        </button>
+      </form>
+    </div>
+  </div>
+
+  <!-- Production Rules & Limits Modal -->
+  <div id="modalProductionRules" class="fixed inset-0 z-50 bg-black/85 backdrop-blur-md hidden flex items-center justify-center p-4">
+    <div class="bg-surface-low border border-border rounded-2xl p-5 sm:p-6 max-w-md w-full space-y-4 shadow-2xl relative">
+      <button onclick="closeProductionRulesModal()" class="absolute top-4 right-4 text-text-subtle hover:text-white p-1 rounded-lg">
+        <span class="material-symbols-outlined">close</span>
+      </button>
+
+      <div class="flex items-center gap-3">
+        <div class="w-10 h-10 rounded-xl bg-amber-500/20 border border-amber-500/30 flex items-center justify-center">
+          <span class="material-symbols-outlined text-amber-400 text-[24px]">tune</span>
+        </div>
+        <div>
+          <h3 class="font-headline text-base sm:text-lg font-bold text-white">Autonomous Rules & Limits</h3>
+          <p class="text-xs text-text-muted">Configure daily publishing quotas and safety thresholds.</p>
+        </div>
+      </div>
+
+      <form id="formProductionRules" onsubmit="submitProductionRules(event)" class="space-y-3">
+        <div class="grid grid-cols-3 gap-2">
+          <div>
+            <label class="block text-[10px] font-headline text-text-muted mb-1">Max Shorts/Day</label>
+            <input type="number" id="ruleShortsLimit" min="1" max="10" value="3" class="w-full bg-surface-card text-white text-xs font-mono rounded-xl border border-border px-2.5 py-1.5">
+          </div>
+          <div>
+            <label class="block text-[10px] font-headline text-text-muted mb-1">Max Long/Day</label>
+            <input type="number" id="ruleLongLimit" min="1" max="5" value="1" class="w-full bg-surface-card text-white text-xs font-mono rounded-xl border border-border px-2.5 py-1.5">
+          </div>
+          <div>
+            <label class="block text-[10px] font-headline text-text-muted mb-1">Max Reels/Day</label>
+            <input type="number" id="ruleReelsLimit" min="1" max="10" value="3" class="w-full bg-surface-card text-white text-xs font-mono rounded-xl border border-border px-2.5 py-1.5">
+          </div>
+        </div>
+
+        <div>
+          <label class="block text-xs font-headline text-text-muted mb-1">Preferred Release Slots (UTC)</label>
+          <input type="text" id="rulePreferredSlots" placeholder="12:00, 16:00, 20:00" class="w-full bg-surface-card text-white text-xs font-mono rounded-xl border border-border px-3.5 py-2">
+        </div>
+
+        <div>
+          <label class="block text-xs font-headline text-text-muted mb-1">Min Dialogue Quality Score (0-100)</label>
+          <input type="number" id="ruleMinQuality" min="30" max="95" value="60" class="w-full bg-surface-card text-white text-xs font-mono rounded-xl border border-border px-3.5 py-2">
+        </div>
+
+        <div class="p-3 bg-surface rounded-xl border border-border space-y-2">
+          <label class="flex items-center justify-between cursor-pointer">
+            <span class="text-xs text-white font-medium">Require Rights Confirmation Gate</span>
+            <input type="checkbox" id="ruleRequireRights" checked class="rounded text-secondary focus:ring-0">
+          </label>
+          <label class="flex items-center justify-between cursor-pointer">
+            <span class="text-xs text-white font-medium">Auto-Publish Due Schedules</span>
+            <input type="checkbox" id="ruleAutoSchedule" checked class="rounded text-secondary focus:ring-0">
+          </label>
+          <label class="flex items-center justify-between cursor-pointer">
+            <span class="text-xs text-white font-medium">FULL_AUTO Mode (Requires Verified Rights)</span>
+            <input type="checkbox" id="ruleFullAuto" class="rounded text-secondary focus:ring-0">
+          </label>
+        </div>
+
+        <button type="submit" class="w-full bg-gradient-to-r from-primary to-secondary hover:brightness-110 text-white font-headline text-xs font-bold py-2.5 rounded-xl shadow-md transition-all">
+          Save Production Rules
+        </button>
+      </form>
+    </div>
+  </div>
+
   <!-- Toast Notification -->
   <div id="toast" class="fixed top-5 right-5 z-50 bg-surface-card border border-border text-white text-xs font-headline px-3.5 py-2.5 rounded-xl shadow-2xl transition-all transform translate-y-[-100px] opacity-0 flex items-center gap-2">
     <span id="toastIcon" class="material-symbols-outlined text-[16px] text-tertiary">check_circle</span>
@@ -1037,6 +1348,10 @@
       });
 
       if (tabId === 'tab-settings') refreshServerLogs();
+      if (tabId === 'tab-schedule') {
+        fetchProductionStatus();
+        fetchProductionCalendar();
+      }
       if (tabId === 'tab-trend-hunter') {
         loadTrendHunterData();
         startTrendHunterPolling();
@@ -2550,6 +2865,547 @@
       }
     }
 
+    // =========================================================================
+    // PHASE 3: AUTONOMOUS PRODUCTION STUDIO & CONTENT CALENDAR LOGIC
+    // =========================================================================
+
+    let currentCalPlatform = 'all';
+
+    function setCalPlatformFilter(plat) {
+      currentCalPlatform = plat;
+      document.querySelectorAll('.cal-filter-plat').forEach(btn => {
+        if (btn.dataset.plat === plat) {
+          btn.className = 'cal-filter-plat px-3 py-1 rounded-lg text-xs font-semibold bg-surface-high text-white border border-border';
+        } else {
+          btn.className = 'cal-filter-plat px-3 py-1 rounded-lg text-xs font-medium text-text-muted hover:text-white';
+        }
+      });
+      fetchProductionCalendar();
+    }
+
+    async function fetchProductionStatus() {
+      try {
+        const res = await fetch('/api/production/status');
+        if (!res.ok) return;
+        const data = await res.json();
+
+        // Update KPIs
+        const sum = data.summary || {};
+        const counts = sum.counts_by_status || {};
+        const schedEl = document.getElementById('prodStatScheduled');
+        const pubEl = document.getElementById('prodStatPublished');
+        if (schedEl) schedEl.textContent = counts.scheduled || 0;
+        if (pubEl) pubEl.textContent = counts.published || 0;
+
+        // Platform status pills
+        const yt = (data.platforms || {}).youtube || {};
+        const ytPill = document.getElementById('prodYtPill');
+        if (ytPill) {
+          if (yt.connected) {
+            ytPill.innerHTML = `<span class="w-2 h-2 rounded-full bg-emerald-500"></span><span class="text-white">${yt.channel_title || 'Connected'}</span>`;
+          } else {
+            ytPill.innerHTML = `<span class="w-2 h-2 rounded-full bg-amber-500"></span><span class="text-text-muted">Not Connected</span>`;
+          }
+        }
+
+        const ig = (data.platforms || {}).instagram || {};
+        const igPill = document.getElementById('prodIgPill');
+        if (igPill) {
+          if (ig.connected) {
+            igPill.innerHTML = `<span class="w-2 h-2 rounded-full bg-emerald-500"></span><span class="text-white">@${ig.username || 'Connected'}</span>`;
+          } else {
+            igPill.innerHTML = `<span class="w-2 h-2 rounded-full bg-text-subtle"></span><span class="text-text-muted">Setup Required</span>`;
+          }
+        }
+      } catch (err) {
+        console.error('Error fetching production status:', err);
+      }
+    }
+
+    async function fetchProductionCalendar() {
+      try {
+        const platParam = currentCalPlatform !== 'all' ? `platform=${currentCalPlatform}` : '';
+        const statusVal = document.getElementById('calStatusSelect') ? document.getElementById('calStatusSelect').value : '';
+        const statusParam = statusVal ? `status=${statusVal}` : '';
+        const qs = [platParam, statusParam].filter(Boolean).join('&');
+        const url = `/api/production/calendar${qs ? '?' + qs : ''}`;
+
+        const res = await fetch(url);
+        if (!res.ok) return;
+        const data = await res.json();
+        renderProductionCalendar(data.days || {}, data.schedules || []);
+        fetchProductionAnalytics();
+      } catch (err) {
+        console.error('Error fetching calendar:', err);
+      }
+    }
+
+    function renderProductionCalendar(daysMap, schedules) {
+      const container = document.getElementById('prodCalendarContainer');
+      if (!container) return;
+
+      const dates = Object.keys(daysMap).sort();
+      if (dates.length === 0) {
+        container.innerHTML = `
+          <div class="p-10 text-center bg-surface-low rounded-2xl border border-border text-text-muted">
+            <span class="material-symbols-outlined text-4xl mb-2 text-text-subtle">event_busy</span>
+            <p class="text-sm font-semibold text-white">No Content Scheduled</p>
+            <p class="text-xs text-text-subtle mt-1">Click "Schedule Clip" to schedule your first viral moment for YouTube or Instagram.</p>
+          </div>
+        `;
+        return;
+      }
+
+      container.innerHTML = dates.map(dateStr => {
+        const items = daysMap[dateStr] || [];
+        const dateObj = new Date(dateStr);
+        const dayLabel = isNaN(dateObj.getTime()) ? dateStr : dateObj.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
+
+        const cardsHtml = items.map(entry => {
+          const s = entry.schedule;
+          const c = entry.content_item || {};
+          const isPublished = s.status === 'published';
+          const isFailed = s.status === 'failed';
+          const isUploading = s.status === 'uploading';
+
+          // Platform icon & styling
+          let platBadge = '';
+          if (s.platform === 'youtube_shorts') {
+            platBadge = `<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-red-600/20 text-red-400 border border-red-500/30 flex items-center gap-1"><span class="material-symbols-outlined text-[13px]">smart_display</span><span>YT Shorts (9:16)</span></span>`;
+          } else if (s.platform === 'youtube_longform') {
+            platBadge = `<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-600/20 text-amber-400 border border-amber-500/30 flex items-center gap-1"><span class="material-symbols-outlined text-[13px]">play_circle</span><span>YT Long-Form (16:9)</span></span>`;
+          } else {
+            platBadge = `<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-pink-600/20 text-pink-400 border border-pink-500/30 flex items-center gap-1"><span class="material-symbols-outlined text-[13px]">photo_camera</span><span>IG Reels (9:16)</span></span>`;
+          }
+
+          // Status badge
+          let statusBadge = '';
+          if (isPublished) {
+            statusBadge = `<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">PUBLISHED</span>`;
+          } else if (isFailed) {
+            statusBadge = `<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-red-500/20 text-red-400 border border-red-500/30" title="${s.error_message || ''}">FAILED</span>`;
+          } else if (isUploading) {
+            statusBadge = `<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-secondary/20 text-secondary border border-secondary/30 animate-pulse">UPLOADING</span>`;
+          } else {
+            statusBadge = `<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-surface-high text-text-muted border border-border">SCHEDULED</span>`;
+          }
+
+          const rightsBadge = s.rights_confirmed
+            ? `<span class="text-[10px] text-emerald-400 flex items-center gap-0.5 font-medium"><span class="material-symbols-outlined text-[12px]">verified</span><span>Rights Verified</span></span>`
+            : `<span class="text-[10px] text-amber-400 flex items-center gap-0.5 font-medium"><span class="material-symbols-outlined text-[12px]">warning</span><span>Rights Pending</span></span>`;
+
+          const timeFormatted = s.scheduled_time_iso ? s.scheduled_time_iso.replace('T', ' ').replace('Z', '') : 'Time Unset';
+
+          // Action buttons
+          let actionBtns = '';
+          if (isPublished && s.external_url) {
+            actionBtns = `
+              <a href="${s.external_url}" target="_blank" class="px-3 py-1.5 rounded-lg bg-surface-high hover:bg-surface-card text-white text-xs font-semibold flex items-center gap-1">
+                <span>View Live</span>
+                <span class="material-symbols-outlined text-[13px]">open_in_new</span>
+              </a>
+            `;
+          } else {
+            actionBtns = `
+              <button onclick="publishScheduleNow('${s.id}')" class="px-3 py-1.5 rounded-lg bg-gradient-to-r from-primary to-secondary hover:brightness-110 text-white text-xs font-bold flex items-center gap-1 shadow-sm">
+                <span class="material-symbols-outlined text-[14px]">send</span>
+                <span>Publish Now</span>
+              </button>
+              <button onclick="promptReschedule('${s.id}')" class="px-2.5 py-1.5 rounded-lg bg-surface-card hover:bg-surface-high text-text-muted hover:text-white text-xs font-medium">
+                Reschedule
+              </button>
+              ${isFailed ? `<button onclick="retryScheduleItem('${s.id}')" class="px-2.5 py-1.5 rounded-lg bg-surface-card hover:bg-surface-high text-amber-400 text-xs font-medium">Retry</button>` : ''}
+              <button onclick="cancelScheduleItem('${s.id}')" class="px-2 py-1.5 text-text-subtle hover:text-red-400 text-xs">
+                <span class="material-symbols-outlined text-[16px]">delete</span>
+              </button>
+            `;
+          }
+
+          return `
+            <div class="bg-surface-card border border-border rounded-xl p-4 flex flex-col md:flex-row items-start md:items-center justify-between gap-4 hover:border-secondary/50 transition-all">
+              <div class="flex items-start gap-3.5 flex-1 min-w-0">
+                <div class="w-16 h-20 rounded-lg bg-surface flex-shrink-0 overflow-hidden border border-border relative flex items-center justify-center">
+                  ${c.thumbnail_path ? `<img src="/outputs/${c.thumbnail_path.split(/[\\\\/]/).pop()}" class="w-full h-full object-cover">` : `<span class="material-symbols-outlined text-text-subtle">smart_display</span>`}
+                  <span class="absolute bottom-1 right-1 font-mono text-[9px] bg-black/80 px-1 rounded text-white">${Math.round(c.duration_seconds || 30)}s</span>
+                </div>
+                <div class="min-w-0 flex-1 space-y-1">
+                  <div class="flex flex-wrap items-center gap-2">
+                    ${platBadge}
+                    ${statusBadge}
+                    ${rightsBadge}
+                  </div>
+                  <h4 class="font-headline text-sm font-bold text-white truncate max-w-xl" title="${c.title || 'Untitled Clip'}">${c.title || 'Untitled Clip'}</h4>
+                  <div class="flex flex-wrap items-center gap-3 text-[11px] text-text-muted">
+                    <span class="font-mono flex items-center gap-1"><span class="material-symbols-outlined text-[13px]">schedule</span><span>${timeFormatted}</span></span>
+                    <span class="font-mono text-text-subtle">Privacy: ${s.privacy_status}</span>
+                    ${c.dialogue_quality_score ? `<span class="font-mono text-tertiary">QC: ${Math.round(c.dialogue_quality_score)}</span>` : ''}
+                  </div>
+                  ${s.error_message ? `<p class="text-[10px] text-red-400 truncate max-w-md bg-red-950/30 px-2 py-0.5 rounded border border-red-900/40">Error: ${s.error_message}</p>` : ''}
+                </div>
+              </div>
+              <div class="flex items-center gap-2 w-full md:w-auto justify-end">
+                ${actionBtns}
+              </div>
+            </div>
+          `;
+        }).join('');
+
+        return `
+          <div class="space-y-2.5">
+            <div class="flex items-center gap-2 px-1">
+              <span class="material-symbols-outlined text-secondary text-[18px]">calendar_today</span>
+              <h3 class="font-headline text-xs font-bold text-white uppercase tracking-wider">${dayLabel}</h3>
+              <span class="text-[10px] font-mono text-text-subtle">(${items.length} items)</span>
+            </div>
+            <div class="space-y-2">
+              ${cardsHtml}
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    async function fetchProductionAnalytics() {
+      try {
+        const res = await fetch('/api/production/analytics');
+        if (!res.ok) return;
+        const data = await res.json();
+        const el = document.getElementById('prodAnalyticsContent');
+        const engEl = document.getElementById('prodStatEngagement');
+        if (engEl && data.average_engagement_rate !== undefined) {
+          engEl.textContent = `${data.average_engagement_rate}%`;
+        }
+
+        if (!el) return;
+        if (!data.records || data.records.length === 0) {
+          el.innerHTML = '<span class="text-text-subtle">No published clip analytics synchronized yet.</span>';
+          return;
+        }
+
+        const topRecords = data.records.slice(0, 5);
+        el.innerHTML = `
+          <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-1 mb-3">
+            <div class="bg-surface p-2.5 rounded-xl border border-border text-center">
+              <span class="text-[10px] uppercase text-text-muted">Total Views</span>
+              <div class="font-extrabold text-sm text-white">${data.total_views.toLocaleString()}</div>
+            </div>
+            <div class="bg-surface p-2.5 rounded-xl border border-border text-center">
+              <span class="text-[10px] uppercase text-text-muted">Total Likes</span>
+              <div class="font-extrabold text-sm text-white">${data.total_likes.toLocaleString()}</div>
+            </div>
+            <div class="bg-surface p-2.5 rounded-xl border border-border text-center">
+              <span class="text-[10px] uppercase text-text-muted">Total Comments</span>
+              <div class="font-extrabold text-sm text-white">${data.total_comments.toLocaleString()}</div>
+            </div>
+            <div class="bg-surface p-2.5 rounded-xl border border-border text-center">
+              <span class="text-[10px] uppercase text-text-muted">Avg Engagement</span>
+              <div class="font-extrabold text-sm text-tertiary">${data.average_engagement_rate}%</div>
+            </div>
+          </div>
+          <div class="space-y-1.5">
+            ${topRecords.map(r => `
+              <div class="flex items-center justify-between text-[11px] p-2 rounded-lg bg-surface/50 border border-border">
+                <span class="font-mono text-white truncate max-w-[200px]">${r.external_id} (${r.platform})</span>
+                <div class="flex items-center gap-3 text-text-muted font-mono">
+                  <span>👁️ ${r.views}</span>
+                  <span>❤️ ${r.likes}</span>
+                  <span>💬 ${r.comments}</span>
+                  <span class="text-secondary font-bold">${r.engagement_rate}% Eng</span>
+                </div>
+              </div>
+            `).join('')}
+          </div>
+        `;
+      } catch (e) {
+        console.error('Error fetching analytics:', e);
+      }
+    }
+
+    async function syncProductionAnalytics() {
+      showToast('Syncing post-publication metrics from YouTube & Instagram...', 'info');
+      try {
+        const res = await fetch('/api/production/analytics/sync', { method: 'POST' });
+        if (res.ok) {
+          const data = await res.json();
+          showToast(`Analytics synced: ${data.updated_count || 0} clips updated. AI Learner weights adapted!`);
+          fetchProductionStatus();
+          fetchProductionCalendar();
+        } else {
+          showToast('Failed to sync analytics', 'error');
+        }
+      } catch (err) {
+        showToast('Sync error: ' + err.message, 'error');
+      }
+    }
+
+    // Modal helpers
+    async function openProductionScheduleModal() {
+      const modal = document.getElementById('modalProductionSchedule');
+      const select = document.getElementById('schedItemSelect');
+      if (!modal || !select) return;
+
+      select.innerHTML = '<option value="">Loading available clips...</option>';
+      modal.classList.remove('hidden');
+
+      try {
+        const res = await fetch('/api/production/items');
+        const data = await res.json();
+        const items = data.items || [];
+
+        if (items.length > 0) {
+          select.innerHTML = items.map(it => `
+            <option value="${it.id}">${it.title || 'Clip ' + it.id} (${Math.round(it.duration_seconds || 30)}s)</option>
+          `).join('');
+        } else {
+          // Fallback to trend hunter clips
+          const res2 = await fetch('/api/trend-hunter/clips');
+          const data2 = await res2.json();
+          const tclips = data2.clips || [];
+          if (tclips.length > 0) {
+            select.innerHTML = tclips.map(tc => `
+              <option value="${tc.id}">${tc.title || tc.streamer_name + ' Moment'} (${Math.round(tc.duration || 30)}s)</option>
+            `).join('');
+          } else {
+            select.innerHTML = '<option value="">No clips found. Extract or generate clips first.</option>';
+          }
+        }
+      } catch (err) {
+        select.innerHTML = '<option value="">Error loading items</option>';
+      }
+
+      fillSuggestedSlot();
+    }
+
+    function closeProductionScheduleModal() {
+      const modal = document.getElementById('modalProductionSchedule');
+      if (modal) modal.classList.add('hidden');
+    }
+
+    async function fillSuggestedSlot() {
+      const inp = document.getElementById('schedTimeInput');
+      if (!inp) return;
+      // Default to tomorrow 12:00 local time
+      const tomorrow = new Date();
+      tomorrow.setDate(tomorrow.getDate() + 1);
+      tomorrow.setHours(12, 0, 0, 0);
+      const iso = tomorrow.toISOString().slice(0, 16);
+      inp.value = iso;
+    }
+
+    async function submitProductionSchedule(e) {
+      e.preventDefault();
+      const itemId = document.getElementById('schedItemSelect').value;
+      if (!itemId) return showToast('Please select a clip to schedule', 'error');
+
+      const plat = document.querySelector('input[name="schedPlatform"]:checked').value;
+      const timeVal = document.getElementById('schedTimeInput').value;
+      const privacy = document.getElementById('schedPrivacySelect').value;
+      const rights = document.getElementById('schedRightsCheckbox').checked;
+
+      if (!rights) {
+        return showToast('You must confirm rights & ownership to schedule.', 'error');
+      }
+
+      const isoTime = new Date(timeVal).toISOString();
+
+      try {
+        // If the item isn't in production_content_items yet, produce it first
+        let finalItemId = itemId;
+        if (!itemId.startsWith('item_')) {
+          showToast('Rendering platform variants & generating hooks...', 'info');
+          const prodRes = await fetch('/api/production/produce', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ clip_id: itemId, render_variants: false }),
+          });
+          if (prodRes.ok) {
+            const prodData = await prodRes.json();
+            finalItemId = prodData.item.id;
+          }
+        }
+
+        const res = await fetch('/api/production/schedule', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            item_id: finalItemId,
+            platform: plat,
+            scheduled_time_iso: isoTime,
+            privacy_status: privacy,
+            rights_confirmed: rights,
+          }),
+        });
+
+        if (res.ok) {
+          showToast('Clip added to content release calendar!');
+          closeProductionScheduleModal();
+          fetchProductionStatus();
+          fetchProductionCalendar();
+        } else {
+          const err = await res.json();
+          showToast(err.detail || 'Scheduling failed', 'error');
+        }
+      } catch (err) {
+        showToast('Error: ' + err.message, 'error');
+      }
+    }
+
+    async function publishScheduleNow(scheduleId) {
+      if (!confirm('Publish this clip to public platforms immediately?')) return;
+      showToast('Executing platform upload & publishing...', 'info');
+      try {
+        const res = await fetch(`/api/production/schedules/${scheduleId}/publish-now`, { method: 'POST' });
+        if (res.ok) {
+          showToast('Published successfully!');
+          fetchProductionStatus();
+          fetchProductionCalendar();
+        } else {
+          const err = await res.json();
+          showToast(err.detail || 'Publishing failed', 'error');
+        }
+      } catch (err) {
+        showToast('Publish error: ' + err.message, 'error');
+      }
+    }
+
+    async function promptReschedule(scheduleId) {
+      const newTime = prompt('Enter new scheduled time (YYYY-MM-DDTHH:MM:SSZ):', new Date().toISOString());
+      if (!newTime) return;
+      try {
+        const res = await fetch(`/api/production/schedules/${scheduleId}/reschedule`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ scheduled_time_iso: newTime }),
+        });
+        if (res.ok) {
+          showToast('Rescheduled successfully');
+          fetchProductionCalendar();
+        }
+      } catch (err) {
+        showToast('Error: ' + err.message, 'error');
+      }
+    }
+
+    async function cancelScheduleItem(scheduleId) {
+      if (!confirm('Cancel this scheduled release?')) return;
+      try {
+        const res = await fetch(`/api/production/schedules/${scheduleId}/cancel`, { method: 'POST' });
+        if (res.ok) {
+          showToast('Release cancelled');
+          fetchProductionCalendar();
+        }
+      } catch (err) {
+        showToast('Error: ' + err.message, 'error');
+      }
+    }
+
+    async function retryScheduleItem(scheduleId) {
+      try {
+        const res = await fetch(`/api/production/schedules/${scheduleId}/retry`, { method: 'POST' });
+        if (res.ok) {
+          showToast('Schedule reset to retrying state');
+          fetchProductionCalendar();
+        }
+      } catch (err) {
+        showToast('Error: ' + err.message, 'error');
+      }
+    }
+
+    function openInstagramModal() {
+      const modal = document.getElementById('modalInstagramConnect');
+      if (modal) modal.classList.remove('hidden');
+    }
+
+    function closeInstagramModal() {
+      const modal = document.getElementById('modalInstagramConnect');
+      if (modal) modal.classList.add('hidden');
+    }
+
+    async function submitInstagramConnect(e) {
+      e.preventDefault();
+      const userId = document.getElementById('igUserIdInput').value.trim();
+      const token = document.getElementById('igAccessTokenInput').value.trim();
+      showToast('Verifying Meta Graph API token...', 'info');
+
+      try {
+        const res = await fetch('/api/production/instagram/connect', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ user_id: userId, access_token: token }),
+        });
+        const data = await res.json();
+        if (data.connected) {
+          showToast(`Connected to Instagram @${data.username}!`);
+          closeInstagramModal();
+          fetchProductionStatus();
+        } else {
+          showToast(data.message || 'Verification failed', 'error');
+        }
+      } catch (err) {
+        showToast('Connection error: ' + err.message, 'error');
+      }
+    }
+
+    async function openProductionRulesModal() {
+      const modal = document.getElementById('modalProductionRules');
+      if (!modal) return;
+      modal.classList.remove('hidden');
+
+      try {
+        const res = await fetch('/api/production/rules');
+        const rules = await res.json();
+        document.getElementById('ruleShortsLimit').value = rules.daily_limit_shorts || 3;
+        document.getElementById('ruleLongLimit').value = rules.daily_limit_longform || 1;
+        document.getElementById('ruleReelsLimit').value = rules.daily_limit_reels || 3;
+        document.getElementById('rulePreferredSlots').value = (rules.preferred_slots || []).join(', ');
+        document.getElementById('ruleMinQuality').value = rules.min_quality_score || 60;
+        document.getElementById('ruleRequireRights').checked = rules.require_rights_confirmation !== false;
+        document.getElementById('ruleAutoSchedule').checked = rules.auto_schedule_enabled !== false;
+        document.getElementById('ruleFullAuto').checked = Boolean(rules.full_auto_enabled);
+      } catch (err) {
+        console.error('Error fetching rules:', err);
+      }
+    }
+
+    function closeProductionRulesModal() {
+      const modal = document.getElementById('modalProductionRules');
+      if (modal) modal.classList.add('hidden');
+    }
+
+    async function submitProductionRules(e) {
+      e.preventDefault();
+      const slotsStr = document.getElementById('rulePreferredSlots').value;
+      const slots = slotsStr.split(',').map(s => s.trim()).filter(Boolean);
+
+      const payload = {
+        daily_limit_shorts: parseInt(document.getElementById('ruleShortsLimit').value, 10),
+        daily_limit_longform: parseInt(document.getElementById('ruleLongLimit').value, 10),
+        daily_limit_reels: parseInt(document.getElementById('ruleReelsLimit').value, 10),
+        preferred_slots: slots,
+        min_quality_score: parseFloat(document.getElementById('ruleMinQuality').value),
+        require_rights_confirmation: document.getElementById('ruleRequireRights').checked,
+        auto_schedule_enabled: document.getElementById('ruleAutoSchedule').checked,
+        full_auto_enabled: document.getElementById('ruleFullAuto').checked,
+      };
+
+      try {
+        const res = await fetch('/api/production/rules', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
+        if (res.ok) {
+          showToast('Production rules and limits updated!');
+          closeProductionRulesModal();
+          fetchProductionStatus();
+        } else {
+          showToast('Failed to update rules', 'error');
+        }
+      } catch (err) {
+        showToast('Error: ' + err.message, 'error');
+      }
+    }
+
     // Polling interval
     setInterval(() => {
       if (currentBatchId) selectBatch(currentBatchId);
@@ -2561,6 +3417,8 @@
     loadBatches();
     pollChatEngineStatus();
     loadTrendHunterData();
+    fetchProductionStatus();
+    fetchProductionCalendar();
 
   </script>
 </body>

@@ -474,6 +474,12 @@ def start_scheduler():
         trend_hunter_service.initialize_default_channels()
     except Exception as exc:
         logger.warning("Trend hunter init warning: %s", exc)
+    try:
+        from .production import init_production_tables, production_service
+        init_production_tables()
+        production_service.start_worker()
+    except Exception as exc:
+        logger.warning("Production service init warning: %s", exc)
     get_batch_worker().start()
     if not _scheduler_started:
         threading.Thread(target=_scheduled_worker, name="autoclip-scheduler", daemon=True).start()
@@ -486,6 +492,11 @@ def stop_background_services():
         from .trend_hunter import trend_hunter_service
         trend_hunter_service.job_queue.stop_worker()
         trend_hunter_service.ranking_scheduler.stop()
+    except Exception:
+        pass
+    try:
+        from .production import production_service
+        production_service.stop_worker()
     except Exception:
         pass
 
@@ -1475,5 +1486,206 @@ async def api_trend_hunter_simulate(payload: dict = Body(default={})):
         is_simulation=True,
     )
     return {"status": "simulation_started", "session": session}
+
+
+# =============================================================================
+# AUTONOMOUS PRODUCTION & CONTENT CALENDAR (PHASE 3) ENDPOINTS
+# =============================================================================
+
+@app.get("/api/production/status")
+def api_production_status():
+    from .production import production_service
+    return production_service.get_global_status()
+
+
+@app.get("/api/production/platforms")
+def api_production_platforms():
+    from .production import production_service
+    return production_service.publisher.get_platforms_status()
+
+
+@app.post("/api/production/instagram/connect")
+def api_production_instagram_connect(payload: dict = Body(...)):
+    from .production import production_service
+    token = payload.get("access_token")
+    user_id = payload.get("user_id")
+    if not token or not user_id:
+        raise HTTPException(400, "Both 'access_token' and 'user_id' are required.")
+    production_service.publisher.ig_publisher.save_credentials(token, user_id)
+    return production_service.publisher.ig_publisher.check_status()
+
+
+@app.get("/api/production/rules")
+def api_production_get_rules():
+    from .production import production_service
+    return production_service.storage.get_rules().to_dict()
+
+
+@app.post("/api/production/rules")
+def api_production_update_rules(payload: dict = Body(...)):
+    from .production import ProductionRules, production_service
+    current = production_service.storage.get_rules()
+    new_rules = ProductionRules(
+        daily_limit_shorts=int(payload.get("daily_limit_shorts", current.daily_limit_shorts)),
+        daily_limit_longform=int(payload.get("daily_limit_longform", current.daily_limit_longform)),
+        daily_limit_reels=int(payload.get("daily_limit_reels", current.daily_limit_reels)),
+        preferred_slots=payload.get("preferred_slots", current.preferred_slots),
+        min_quality_score=float(payload.get("min_quality_score", current.min_quality_score)),
+        require_rights_confirmation=bool(payload.get("require_rights_confirmation", current.require_rights_confirmation)),
+        full_auto_enabled=bool(payload.get("full_auto_enabled", current.full_auto_enabled)),
+        auto_schedule_enabled=bool(payload.get("auto_schedule_enabled", current.auto_schedule_enabled)),
+    )
+    production_service.storage.save_rules(new_rules)
+    return {"status": "updated", "rules": new_rules.to_dict()}
+
+
+@app.get("/api/production/calendar")
+def api_production_calendar(
+    start_date: str | None = None,
+    end_date: str | None = None,
+    platform: str | None = None,
+    status: str | None = None,
+):
+    from .production import production_service
+    return production_service.calendar.get_calendar_view(
+        start_date=start_date,
+        end_date=end_date,
+        platform=platform,
+        status=status,
+    )
+
+
+@app.get("/api/production/items")
+def api_production_list_items(limit: int = 50):
+    from .production import production_service
+    items = production_service.storage.list_content_items(limit=limit)
+    return {"items": [item.to_dict() for item in items]}
+
+
+@app.post("/api/production/produce")
+def api_production_produce(payload: dict = Body(...)):
+    from .production import production_service
+    clip_id = payload.get("clip_id")
+    if not clip_id:
+        raise HTTPException(400, "clip_id is required.")
+    title = payload.get("title")
+    description = payload.get("description")
+    render_variants = bool(payload.get("render_variants", True))
+
+    try:
+        item = production_service.produce_content_from_clip(
+            clip_id=clip_id,
+            title=title,
+            description=description,
+            render_variants=render_variants,
+        )
+        return {"status": "produced", "item": item.to_dict()}
+    except FileNotFoundError as f_err:
+        raise HTTPException(404, str(f_err))
+    except Exception as exc:
+        raise HTTPException(500, f"Content production failed: {exc}")
+
+
+@app.post("/api/production/schedule")
+def api_production_schedule(payload: dict = Body(...)):
+    from .production import production_service
+    item_id = payload.get("item_id")
+    if not item_id:
+        raise HTTPException(400, "item_id is required.")
+    platform = payload.get("platform", "youtube_shorts")
+    scheduled_time = payload.get("scheduled_time_iso")
+    privacy = payload.get("privacy_status", "private")
+    rights_confirmed = bool(payload.get("rights_confirmed", False))
+
+    try:
+        sched = production_service.calendar.schedule_item(
+            item_id=item_id,
+            platform=platform,
+            scheduled_time_iso=scheduled_time,
+            privacy_status=privacy,
+            rights_confirmed=rights_confirmed,
+        )
+        return {"status": "scheduled", "schedule": sched.to_dict()}
+    except ValueError as v_err:
+        raise HTTPException(404, str(v_err))
+    except Exception as exc:
+        raise HTTPException(500, f"Scheduling failed: {exc}")
+
+
+@app.post("/api/production/schedules/{schedule_id}/reschedule")
+def api_production_reschedule(schedule_id: str, payload: dict = Body(...)):
+    from .production import production_service
+    new_time = payload.get("scheduled_time_iso")
+    if not new_time:
+        raise HTTPException(400, "scheduled_time_iso is required.")
+    ok = production_service.calendar.reschedule(schedule_id, new_time)
+    if not ok:
+        raise HTTPException(404, f"Schedule {schedule_id} not found.")
+    return {"status": "rescheduled", "schedule_id": schedule_id, "new_time": new_time}
+
+
+@app.post("/api/production/schedules/{schedule_id}/cancel")
+def api_production_cancel(schedule_id: str):
+    from .production import production_service
+    ok = production_service.calendar.cancel(schedule_id)
+    if not ok:
+        raise HTTPException(404, f"Schedule {schedule_id} not found.")
+    return {"status": "cancelled", "schedule_id": schedule_id}
+
+
+@app.post("/api/production/schedules/{schedule_id}/retry")
+def api_production_retry(schedule_id: str):
+    from .production import production_service
+    ok = production_service.calendar.retry(schedule_id)
+    if not ok:
+        raise HTTPException(404, f"Schedule {schedule_id} not found.")
+    return {"status": "retrying", "schedule_id": schedule_id}
+
+
+@app.post("/api/production/schedules/{schedule_id}/publish-now")
+def api_production_publish_now(schedule_id: str):
+    from .production import (
+        DuplicateUploadError,
+        PublisherError,
+        QuotaExceededError,
+        RightsConfirmationRequiredError,
+        production_service,
+    )
+    try:
+        res = production_service.publisher.publish_schedule(schedule_id)
+        return {"status": "published", "result": res}
+    except RightsConfirmationRequiredError as r_err:
+        raise HTTPException(403, str(r_err))
+    except DuplicateUploadError as d_err:
+        raise HTTPException(409, str(d_err))
+    except QuotaExceededError as q_err:
+        raise HTTPException(429, str(q_err))
+    except PublisherError as p_err:
+        raise HTTPException(502, str(p_err))
+    except Exception as exc:
+        raise HTTPException(500, f"Publication execution failed: {exc}")
+
+
+@app.get("/api/production/analytics")
+def api_production_analytics():
+    from .production import production_service
+    return production_service.analytics.get_analytics_summary()
+
+
+@app.post("/api/production/analytics/sync")
+def api_production_analytics_sync():
+    from .production import production_service
+    updated = production_service.analytics.sync_all_analytics()
+    return {"status": "synced", "updated_count": len(updated), "items": [u.to_dict() for u in updated]}
+
+
+@app.post("/api/production/validate-subtitles")
+def api_production_validate_subtitles(payload: dict = Body(...)):
+    from .production import SubtitleTimingValidator
+    srt_text = payload.get("srt_text", "")
+    duration = float(payload.get("duration", 0.0))
+    is_valid, errors = SubtitleTimingValidator.validate_srt(srt_text, clip_duration=duration)
+    return {"valid": is_valid, "errors": errors}
+
 
 
