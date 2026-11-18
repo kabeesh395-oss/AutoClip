@@ -339,7 +339,7 @@ class MultiPublisherRouter:
             raise PublisherError(sched.error_message)
 
         # 3. Duplicate Prevention via SHA256 Fingerprint
-        if item.sha256_hash and self.storage.is_hash_published(item.sha256_hash, sched.platform):
+        if item.sha256_hash and self.storage.is_hash_published(item.sha256_hash, sched.platform, exclude_schedule_id=sched.id):
             sched.status = PublishStatus.FAILED.value
             sched.error_message = "Duplicate detected: this video hash has already been published/scheduled."
             self.storage.update_schedule(sched)

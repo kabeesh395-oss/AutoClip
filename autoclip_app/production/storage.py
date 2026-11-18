@@ -399,15 +399,22 @@ class ProductionStorage:
     # -------------------------------------------------------------------------
     # Duplicate Prevention & Limits
     # -------------------------------------------------------------------------
-    def is_hash_published(self, sha256_hash: str | None, platform: str) -> bool:
+    def is_hash_published(self, sha256_hash: str | None, platform: str, exclude_schedule_id: str | None = None) -> bool:
         if not sha256_hash:
             return False
         with get_production_db(self.db_path) as conn:
-            row = conn.execute("""
-                SELECT s.id FROM production_schedules s
-                JOIN production_content_items c ON s.item_id = c.id
-                WHERE c.sha256_hash = ? AND s.platform = ? AND s.status IN ('published', 'uploading', 'scheduled');
-            """, (sha256_hash, platform)).fetchone()
+            if exclude_schedule_id:
+                row = conn.execute("""
+                    SELECT s.id FROM production_schedules s
+                    JOIN production_content_items c ON s.item_id = c.id
+                    WHERE c.sha256_hash = ? AND s.platform = ? AND s.id != ? AND s.status IN ('published', 'uploading', 'scheduled');
+                """, (sha256_hash, platform, exclude_schedule_id)).fetchone()
+            else:
+                row = conn.execute("""
+                    SELECT s.id FROM production_schedules s
+                    JOIN production_content_items c ON s.item_id = c.id
+                    WHERE c.sha256_hash = ? AND s.platform = ? AND s.status IN ('published', 'uploading', 'scheduled');
+                """, (sha256_hash, platform)).fetchone()
             return row is not None
 
     def count_published_today(self, platform: str, date_prefix_utc: str | None = None) -> int:
