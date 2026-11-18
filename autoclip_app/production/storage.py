@@ -127,6 +127,42 @@ def init_production_tables(db_path: Path = DEFAULT_DB) -> None:
                 ) VALUES (1, 3, 1, 3, ?, 60.0, 1, 0, 1, ?);
             """, (json.dumps(["12:00", "16:00", "20:00"]), datetime.now(timezone.utc).isoformat()))
 
+        # Storage cleanup management tables
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS production_storage_cleanup_settings (
+                id INTEGER PRIMARY KEY CHECK (id = 1),
+                auto_cleanup_enabled INTEGER NOT NULL DEFAULT 1,
+                retention_hours INTEGER NOT NULL DEFAULT 72,
+                dry_run INTEGER NOT NULL DEFAULT 0,
+                updated_at TEXT NOT NULL
+            );
+        """)
+
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS production_storage_cleanup_history (
+                id TEXT PRIMARY KEY,
+                item_id TEXT NOT NULL,
+                schedule_id TEXT,
+                external_id TEXT,
+                file_path TEXT NOT NULL,
+                file_size_bytes INTEGER NOT NULL DEFAULT 0,
+                published_at TEXT,
+                deleted_at TEXT NOT NULL,
+                status TEXT NOT NULL,
+                reason TEXT,
+                created_at TEXT NOT NULL
+            );
+        """)
+
+        # Default cleanup settings if not existing
+        cleanup_row = conn.execute("SELECT id FROM production_storage_cleanup_settings WHERE id = 1;").fetchone()
+        if not cleanup_row:
+            conn.execute("""
+                INSERT INTO production_storage_cleanup_settings (
+                    id, auto_cleanup_enabled, retention_hours, dry_run, updated_at
+                ) VALUES (1, 1, 72, 0, ?);
+            """, (datetime.now(timezone.utc).isoformat(),))
+
 
 class ProductionStorage:
     def __init__(self, db_path: Path = DEFAULT_DB) -> None:

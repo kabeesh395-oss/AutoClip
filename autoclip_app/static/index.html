@@ -141,6 +141,10 @@
           <span>Trend Hunter</span>
           <span id="navTrendHunterBadge" class="hidden font-mono text-[9px] bg-amber-500/30 text-amber-300 px-1.5 py-0.2 rounded-full font-bold animate-pulse">LIVE</span>
         </button>
+        <button data-tab="tab-storage" class="nav-btn flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-text-muted hover:text-white font-headline text-xs font-medium transition-colors">
+          <span class="material-symbols-outlined text-[17px] text-cyan-400">cleaning_services</span>
+          <span>Storage</span>
+        </button>
         <button data-tab="tab-settings" class="nav-btn flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-text-muted hover:text-white font-headline text-xs font-medium transition-colors">
           <span class="material-symbols-outlined text-[17px]">settings</span>
           <span>Settings</span>
@@ -896,6 +900,263 @@
       </section>
 
     </div>
+
+    <!-- ======================================================================= -->
+    <!-- TAB 7: SMART STORAGE CLEANUP & DISK RECLAMATION                         -->
+    <!-- ======================================================================= -->
+    <div id="tab-storage" class="tab-content hidden space-y-6">
+      <!-- Header banner -->
+      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-surface-low border border-border rounded-2xl p-5 shadow-lg">
+        <div class="space-y-1">
+          <div class="flex items-center gap-2.5">
+            <span class="material-symbols-outlined text-cyan-400 text-[26px]">cleaning_services</span>
+            <h2 class="font-headline text-lg sm:text-xl font-bold text-white">Smart Storage Cleanup</h2>
+            <span id="storageAutoStatusBadge" class="font-mono text-[10px] px-2.5 py-0.5 rounded-full font-bold bg-cyan-500/20 text-cyan-300 border border-cyan-500/30">Auto-Cleanup Active</span>
+          </div>
+          <p class="text-xs text-text-muted">Safely cleans up rendered videos 72 hours after verified Public publication on YouTube. Keeps unpublished, Private, Unlisted, scheduled, and failed uploads strictly protected.</p>
+        </div>
+
+        <div class="flex items-center gap-2">
+          <button onclick="loadStorageManagerData()" class="px-3 py-1.5 rounded-xl bg-surface hover:bg-surface-high border border-border text-white text-xs font-headline flex items-center gap-1.5 transition-colors">
+            <span class="material-symbols-outlined text-[16px]">refresh</span>
+            <span>Refresh</span>
+          </button>
+          <button onclick="runManualStorageCleanup()" class="px-4 py-1.5 rounded-xl bg-gradient-to-r from-cyan-600 to-blue-600 hover:brightness-110 text-white text-xs font-headline font-bold flex items-center gap-1.5 shadow-md transition-all">
+            <span class="material-symbols-outlined text-[16px]">delete_sweep</span>
+            <span>Run Safe Cleanup Now</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- KPI Metrics Grid -->
+      <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <!-- Metric 1: Total Rendered Size -->
+        <div class="bg-surface-low border border-border rounded-2xl p-4 sm:p-5 flex flex-col justify-between">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-headline font-semibold text-text-muted">Rendered Storage</span>
+            <span class="material-symbols-outlined text-cyan-400 text-[20px]">hard_drive</span>
+          </div>
+          <div class="mt-3">
+            <div id="storageTotalRendered" class="font-headline text-xl sm:text-2xl font-black text-white">0.0 MB</div>
+            <div class="text-[11px] text-text-subtle mt-0.5">Active rendered files on disk</div>
+          </div>
+        </div>
+
+        <!-- Metric 2: Recovered Storage -->
+        <div class="bg-surface-low border border-border rounded-2xl p-4 sm:p-5 flex flex-col justify-between">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-headline font-semibold text-text-muted">Space Reclaimed</span>
+            <span class="material-symbols-outlined text-emerald-400 text-[20px]">recycling</span>
+          </div>
+          <div class="mt-3">
+            <div id="storageTotalRecovered" class="font-headline text-xl sm:text-2xl font-black text-emerald-400">0.0 MB</div>
+            <div class="text-[11px] text-text-subtle mt-0.5"><span id="storageHistoryCount">0</span> files safely cleaned</div>
+          </div>
+        </div>
+
+        <!-- Metric 3: Public Awaiting Cleanup -->
+        <div class="bg-surface-low border border-border rounded-2xl p-4 sm:p-5 flex flex-col justify-between">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-headline font-semibold text-text-muted">Public Under Retention</span>
+            <span class="material-symbols-outlined text-amber-400 text-[20px]">hourglass_bottom</span>
+          </div>
+          <div class="mt-3">
+            <div id="storagePublicAwaiting" class="font-headline text-xl sm:text-2xl font-black text-amber-400">0</div>
+            <div class="text-[11px] text-text-subtle mt-0.5">Active 72-hour safety timer</div>
+          </div>
+        </div>
+
+        <!-- Metric 4: Protected Videos -->
+        <div class="bg-surface-low border border-border rounded-2xl p-4 sm:p-5 flex flex-col justify-between">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-headline font-semibold text-text-muted">Protected Videos</span>
+            <span class="material-symbols-outlined text-indigo-400 text-[20px]">shield</span>
+          </div>
+          <div class="mt-3">
+            <div id="storageProtectedCount" class="font-headline text-xl sm:text-2xl font-black text-indigo-400">0</div>
+            <div class="text-[11px] text-text-subtle mt-0.5"><span id="storageUnlistedCount">0</span> unlisted/private · <span id="storagePendingCount">0</span> not uploaded</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Controls & Safety Rules Split -->
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <!-- Settings Form Card (1 col) -->
+        <div class="bg-surface-low border border-border rounded-2xl p-5 space-y-4">
+          <div class="flex items-center justify-between border-b border-border/60 pb-3">
+            <h3 class="font-headline text-sm font-bold text-white flex items-center gap-2">
+              <span class="material-symbols-outlined text-secondary text-[20px]">tune</span>
+              <span>Cleanup Configuration</span>
+            </h3>
+            <span class="font-mono text-[10px] text-text-subtle">SQLite Persisted</span>
+          </div>
+
+          <form id="storageSettingsForm" onsubmit="saveStorageSettings(event)" class="space-y-4">
+            <!-- Auto Cleanup Toggle -->
+            <div class="flex items-center justify-between bg-surface p-3 rounded-xl border border-border">
+              <div class="space-y-0.5">
+                <label for="storageAutoToggle" class="text-xs font-headline font-semibold text-white block cursor-pointer">Automatic Background Cleanup</label>
+                <p class="text-[11px] text-text-subtle">Scheduler runs cleanup every 30s</p>
+              </div>
+              <input type="checkbox" id="storageAutoToggle" class="w-4 h-4 accent-cyan-500 rounded cursor-pointer">
+            </div>
+
+            <!-- Retention Period Select -->
+            <div class="space-y-1">
+              <label for="storageRetentionSelect" class="block text-xs font-headline text-text-muted">Retention Countdown Window</label>
+              <select id="storageRetentionSelect" class="w-full bg-surface-card text-white text-xs rounded-xl border border-border px-3.5 py-2.5 font-mono cursor-pointer">
+                <option value="72">72 Hours (Default & Recommended)</option>
+                <option value="48">48 Hours</option>
+              </select>
+              <p class="text-[10px] text-text-subtle">Countdown starts only after confirmed Public accessibility.</p>
+            </div>
+
+            <!-- Dry Run Mode Checkbox -->
+            <div class="flex items-center justify-between bg-surface p-3 rounded-xl border border-border">
+              <div class="space-y-0.5">
+                <label for="storageDryRunToggle" class="text-xs font-headline font-semibold text-white block cursor-pointer">Dry-Run Simulation Mode</label>
+                <p class="text-[11px] text-text-subtle">Log actions to history without deleting files</p>
+              </div>
+              <input type="checkbox" id="storageDryRunToggle" class="w-4 h-4 accent-amber-500 rounded cursor-pointer">
+            </div>
+
+            <button type="submit" class="w-full bg-surface-high hover:bg-surface-highest text-cyan-300 hover:text-white border border-cyan-500/30 text-xs font-headline font-bold py-2.5 rounded-xl transition-colors">
+              Save Settings
+            </button>
+          </form>
+        </div>
+
+        <!-- Strict Safety Rules Visual Card (2 cols) -->
+        <div class="lg:col-span-2 bg-surface-low border border-border rounded-2xl p-5 space-y-4 flex flex-col justify-between">
+          <div class="space-y-1 border-b border-border/60 pb-3">
+            <div class="flex items-center gap-2">
+              <span class="material-symbols-outlined text-emerald-400 text-[20px]">verified_user</span>
+              <h3 class="font-headline text-sm font-bold text-white">Strict Safety Protocols & Rules A–E</h3>
+            </div>
+            <p class="text-xs text-text-muted">To protect your media, AutoClip enforces strict zero-loss safety verifications before any local file deletion occurs.</p>
+          </div>
+
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div class="bg-surface p-3 rounded-xl border border-border space-y-1">
+              <div class="flex items-center gap-2">
+                <span class="w-2 h-2 rounded-full bg-emerald-400"></span>
+                <span class="text-xs font-headline font-bold text-white">Rule A: Rendered, Not Uploaded</span>
+              </div>
+              <p class="text-[11px] text-text-subtle">Local file is preserved indefinitely until scheduled and published.</p>
+            </div>
+
+            <div class="bg-surface p-3 rounded-xl border border-border space-y-1">
+              <div class="flex items-center gap-2">
+                <span class="w-2 h-2 rounded-full bg-amber-400"></span>
+                <span class="text-xs font-headline font-bold text-white">Rule B: Upload Failed</span>
+              </div>
+              <p class="text-[11px] text-text-subtle">Retained permanently on disk to allow retrying upload without re-rendering.</p>
+            </div>
+
+            <div class="bg-surface p-3 rounded-xl border border-border space-y-1">
+              <div class="flex items-center gap-2">
+                <span class="w-2 h-2 rounded-full bg-purple-400"></span>
+                <span class="text-xs font-headline font-bold text-white">Rule C: Private or Unlisted</span>
+              </div>
+              <p class="text-[11px] text-text-subtle">Never deleted automatically. File is kept until the video is made Public.</p>
+            </div>
+
+            <div class="bg-surface p-3 rounded-xl border border-border space-y-1">
+              <div class="flex items-center gap-2">
+                <span class="w-2 h-2 rounded-full bg-blue-400"></span>
+                <span class="text-xs font-headline font-bold text-white">Rule D: Scheduled for Future</span>
+              </div>
+              <p class="text-[11px] text-text-subtle">Preserved. Deletion countdown does not start until the video actually goes live.</p>
+            </div>
+
+            <div class="bg-surface p-3 rounded-xl border border-cyan-500/30 sm:col-span-2 space-y-1 bg-cyan-950/20">
+              <div class="flex items-center gap-2">
+                <span class="w-2 h-2 rounded-full bg-cyan-400 animate-pulse"></span>
+                <span class="text-xs font-headline font-bold text-cyan-300">Rule E: Verified Public on YouTube</span>
+              </div>
+              <p class="text-[11px] text-text-muted">YouTube oEmbed confirms live public availability. Starts 72-hour countdown. Safely deletes only after 72 hours.</p>
+            </div>
+          </div>
+
+          <div class="p-3 bg-surface rounded-xl border border-border text-[11px] text-text-subtle flex items-center gap-2">
+            <span class="material-symbols-outlined text-amber-400 text-[18px]">lock</span>
+            <span>Original source videos, raw uploads, application code, and databases are strictly excluded from deletion.</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Rendered Videos & Retention Queue Table -->
+      <div class="bg-surface-low border border-border rounded-2xl p-5 space-y-4">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-border/60 pb-3">
+          <div class="space-y-0.5">
+            <div class="flex items-center gap-2">
+              <span class="material-symbols-outlined text-secondary text-[22px]">video_file</span>
+              <h3 class="font-headline text-base font-bold text-white">Rendered Videos & Retention Countdown Queue</h3>
+              <span id="storageCandidateCountBadge" class="font-mono text-[10px] px-2 py-0.5 rounded-full bg-surface text-text-muted border border-border font-bold">0 Items</span>
+            </div>
+            <p class="text-xs text-text-muted">Live status of rendered files on disk, verification on YouTube, and real-time retention countdown timers.</p>
+          </div>
+        </div>
+
+        <div class="overflow-x-auto">
+          <table class="w-full text-left text-xs">
+            <thead>
+              <tr class="border-b border-border text-text-subtle font-headline uppercase tracking-wider text-[10px]">
+                <th class="py-3 px-3">Video Title / ID</th>
+                <th class="py-3 px-3">File Size</th>
+                <th class="py-3 px-3">Status</th>
+                <th class="py-3 px-3">YouTube Link</th>
+                <th class="py-3 px-3">Retention Countdown</th>
+                <th class="py-3 px-3 text-right">Action</th>
+              </tr>
+            </thead>
+            <tbody id="storageCandidatesTableBody" class="divide-y divide-border/60">
+              <tr>
+                <td colspan="6" class="py-8 text-center text-text-muted text-xs">
+                  Loading rendered video inventory...
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Cleanup Audit History Table -->
+      <div class="bg-surface-low border border-border rounded-2xl p-5 space-y-4">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-border/60 pb-3">
+          <div class="space-y-0.5">
+            <div class="flex items-center gap-2">
+              <span class="material-symbols-outlined text-text-subtle text-[22px]">history</span>
+              <h3 class="font-headline text-base font-bold text-white">Cleanup History & Audit Log</h3>
+              <span id="storageHistoryCountBadge" class="font-mono text-[10px] px-2 py-0.5 rounded-full bg-surface text-text-muted border border-border font-bold">0 Records</span>
+            </div>
+            <p class="text-xs text-text-muted">Audit log of all deleted and skipped files with timestamps, recovered disk space, and verification reasons.</p>
+          </div>
+        </div>
+
+        <div class="overflow-x-auto">
+          <table class="w-full text-left text-xs">
+            <thead>
+              <tr class="border-b border-border text-text-subtle font-headline uppercase tracking-wider text-[10px]">
+                <th class="py-3 px-3">Timestamp (UTC)</th>
+                <th class="py-3 px-3">File Name</th>
+                <th class="py-3 px-3">Recovered Size</th>
+                <th class="py-3 px-3">Status</th>
+                <th class="py-3 px-3">Verification Details & Reason</th>
+              </tr>
+            </thead>
+            <tbody id="storageHistoryTableBody" class="divide-y divide-border/60">
+              <tr>
+                <td colspan="5" class="py-8 text-center text-text-muted text-xs">
+                  No cleanup actions recorded yet.
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+    </div>
   </main>
 
   <!-- ========================================================================= -->
@@ -948,6 +1209,10 @@
     <button onclick="switchTab('tab-trend-hunter')" class="mobile-nav-btn flex flex-col items-center py-1 px-2 text-text-muted hover:text-white transition-colors" data-mobtab="tab-trend-hunter">
       <span class="material-symbols-outlined text-[20px] text-amber-400">radar</span>
       <span class="text-[10px] font-headline font-medium mt-0.5">Trend Hunter</span>
+    </button>
+    <button onclick="switchTab('tab-storage')" class="mobile-nav-btn flex flex-col items-center py-1 px-2 text-text-muted hover:text-white transition-colors" data-mobtab="tab-storage">
+      <span class="material-symbols-outlined text-[20px] text-cyan-400">cleaning_services</span>
+      <span class="text-[10px] font-headline font-medium mt-0.5">Storage</span>
     </button>
     <button onclick="switchTab('tab-settings')" class="mobile-nav-btn flex flex-col items-center py-1 px-2 text-text-muted hover:text-white transition-colors" data-mobtab="tab-settings">
       <span class="material-symbols-outlined text-[20px]">settings</span>
@@ -1355,6 +1620,9 @@
       if (tabId === 'tab-trend-hunter') {
         loadTrendHunterData();
         startTrendHunterPolling();
+      }
+      if (tabId === 'tab-storage') {
+        loadStorageManagerData();
       }
     }
 
@@ -3406,6 +3674,285 @@
       }
     }
 
+    // =========================================================================
+    // SMART STORAGE CLEANUP & DISK RECLAMATION LOGIC
+    // =========================================================================
+    async function loadStorageManagerData() {
+      try {
+        const res = await fetch('/api/production/storage/status');
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        const data = await res.json();
+
+        // 1. Update KPI Cards
+        const totalRenderedEl = document.getElementById('storageTotalRendered');
+        const totalRecoveredEl = document.getElementById('storageTotalRecovered');
+        const publicAwaitingEl = document.getElementById('storagePublicAwaiting');
+        const protectedEl = document.getElementById('storageProtectedCount');
+        const unlistedCountEl = document.getElementById('storageUnlistedCount');
+        const pendingCountEl = document.getElementById('storagePendingCount');
+        const historyCountEl = document.getElementById('storageHistoryCount');
+
+        if (totalRenderedEl) totalRenderedEl.textContent = data.total_rendered_formatted || '0.0 MB';
+        if (totalRecoveredEl) totalRecoveredEl.textContent = data.total_recovered_formatted || '0.0 MB';
+        if (publicAwaitingEl) publicAwaitingEl.textContent = (data.public_awaiting_cleanup || 0).toString();
+        if (protectedEl) protectedEl.textContent = ((data.unlisted_private_count || 0) + (data.files_waiting_for_publish || 0)).toString();
+        if (unlistedCountEl) unlistedCountEl.textContent = (data.unlisted_private_count || 0).toString();
+        if (pendingCountEl) pendingCountEl.textContent = (data.files_waiting_for_publish || 0).toString();
+        if (historyCountEl) historyCountEl.textContent = (data.history_records_count || 0).toString();
+
+        // 2. Update Settings Form
+        const autoToggle = document.getElementById('storageAutoToggle');
+        const retentionSelect = document.getElementById('storageRetentionSelect');
+        const badge = document.getElementById('storageAutoStatusBadge');
+
+        if (autoToggle) autoToggle.checked = Boolean(data.auto_cleanup_enabled);
+        if (retentionSelect && data.retention_hours) retentionSelect.value = data.retention_hours.toString();
+        if (badge) {
+          if (data.auto_cleanup_enabled) {
+            badge.className = 'font-mono text-[10px] px-2.5 py-0.5 rounded-full font-bold bg-cyan-500/20 text-cyan-300 border border-cyan-500/30';
+            badge.textContent = 'Auto-Cleanup Active (' + (data.retention_hours || 72) + 'h)';
+          } else {
+            badge.className = 'font-mono text-[10px] px-2.5 py-0.5 rounded-full font-bold bg-surface-high text-text-muted border border-border';
+            badge.textContent = 'Auto-Cleanup Paused';
+          }
+        }
+
+        // 3. Render Candidates Table
+        renderStorageCandidates(data.candidates || []);
+
+        // 4. Render History Table
+        renderStorageHistory(data.recent_history || []);
+
+      } catch (err) {
+        console.error('Failed to load storage status:', err);
+      }
+    }
+
+    function renderStorageCandidates(candidates) {
+      const tbody = document.getElementById('storageCandidatesTableBody');
+      const badge = document.getElementById('storageCandidateCountBadge');
+      if (badge) badge.textContent = candidates.length + ' Items';
+      if (!tbody) return;
+
+      if (!candidates || candidates.length === 0) {
+        tbody.innerHTML = `
+          <tr>
+            <td colspan="6" class="py-8 text-center text-text-muted text-xs">
+              No rendered videos currently on disk in data/outputs/.
+            </td>
+          </tr>
+        `;
+        return;
+      }
+
+      tbody.innerHTML = candidates.map(c => {
+        const sizeFormatted = (c.file_size_bytes > 0) ? (c.file_size_bytes / (1024 * 1024)).toFixed(1) + ' MB' : '0 MB';
+        const fileName = (c.file_path || '').split(/[\\/]/).pop();
+
+        // Privacy status badge
+        let statusBadge = '';
+        if (c.privacy_status === 'public') {
+          statusBadge = '<span class="font-mono text-[10px] px-2 py-0.5 rounded-full font-bold bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">Public</span>';
+        } else if (c.privacy_status === 'unlisted' || c.privacy_status === 'unlisted/private') {
+          statusBadge = '<span class="font-mono text-[10px] px-2 py-0.5 rounded-full font-bold bg-purple-500/15 text-purple-300 border border-purple-500/30">Unlisted (Protected)</span>';
+        } else if (c.upload_status === 'failed') {
+          statusBadge = '<span class="font-mono text-[10px] px-2 py-0.5 rounded-full font-bold bg-red-500/15 text-red-300 border border-red-500/30">Failed (Retryable)</span>';
+        } else {
+          statusBadge = '<span class="font-mono text-[10px] px-2 py-0.5 rounded-full font-bold bg-surface-high text-text-muted border border-border">' + (c.upload_status || 'Waiting') + '</span>';
+        }
+
+        // Link
+        let ytLink = '<span class="text-text-subtle font-mono text-[11px]">—</span>';
+        if (c.external_url) {
+          ytLink = `<a href="${c.external_url}" target="_blank" rel="noopener" class="text-cyan-400 hover:underline font-mono text-[11px] flex items-center gap-1">
+            <span>${c.external_id || 'Watch'}</span>
+            <span class="material-symbols-outlined text-[13px]">open_in_new</span>
+          </a>`;
+        }
+
+        // Countdown or protection badge
+        let countdownHtml = '';
+        if (c.eligible_for_deletion) {
+          countdownHtml = `
+            <div class="flex items-center gap-1.5 text-amber-400 font-mono text-[11px] font-bold">
+              <span class="w-2 h-2 rounded-full bg-amber-400 animate-ping"></span>
+              <span>Ready for safe cleanup</span>
+            </div>
+            <div class="text-[10px] text-text-subtle">${c.reason}</div>
+          `;
+        } else if (c.privacy_status === 'public' && c.remaining_seconds > 0) {
+          const totalWindow = (c.retention_hours || 72) * 3600;
+          const pctElapsed = Math.min(100, Math.max(0, ((totalWindow - c.remaining_seconds) / totalWindow) * 100));
+          countdownHtml = `
+            <div class="space-y-1">
+              <div class="flex items-center gap-1.5 text-white font-mono text-[11px] font-bold">
+                <span class="material-symbols-outlined text-[14px] text-cyan-400 animate-pulse">timer</span>
+                <span>${c.remaining_formatted}</span>
+              </div>
+              <div class="w-28 h-1.5 bg-surface-high rounded-full overflow-hidden">
+                <div class="h-full bg-gradient-to-r from-cyan-500 to-blue-500" style="width: ${pctElapsed}%"></div>
+              </div>
+            </div>
+          `;
+        } else {
+          countdownHtml = `
+            <div class="flex items-center gap-1 text-text-muted font-mono text-[11px]">
+              <span class="material-symbols-outlined text-[14px] text-indigo-400">shield</span>
+              <span>${c.remaining_formatted || 'Retained indefinitely'}</span>
+            </div>
+            <div class="text-[10px] text-text-subtle">${c.reason}</div>
+          `;
+        }
+
+        // Action button
+        let actionBtn = '';
+        if (c.privacy_status === 'public' && c.external_id) {
+          actionBtn = `
+            <button onclick="manualDeleteStorageItem('${c.item_id}', '${(c.title || fileName).replace(/'/g, "\\'")}')" class="px-2.5 py-1 rounded-lg bg-surface hover:bg-error/20 text-text-muted hover:text-error border border-border hover:border-error/40 text-[11px] font-headline font-semibold transition-colors flex items-center gap-1 ml-auto" title="Delete rendered video locally (Video remains live on YouTube)">
+              <span class="material-symbols-outlined text-[14px]">delete</span>
+              <span>Reclaim</span>
+            </button>
+          `;
+        } else {
+          actionBtn = `
+            <span class="px-2.5 py-1 rounded-lg bg-surface text-text-subtle border border-border text-[10px] font-headline inline-flex items-center gap-1 ml-auto cursor-not-allowed">
+              <span class="material-symbols-outlined text-[13px]">lock</span>
+              <span>Protected</span>
+            </span>
+          `;
+        }
+
+        return `
+          <tr class="hover:bg-surface/60 transition-colors">
+            <td class="py-3 px-3">
+              <div class="font-headline font-semibold text-white max-w-xs truncate" title="${c.title || fileName}">${c.title || fileName}</div>
+              <div class="font-mono text-[10px] text-text-subtle truncate max-w-xs">${fileName}</div>
+            </td>
+            <td class="py-3 px-3 font-mono text-white text-[11px]">${sizeFormatted}</td>
+            <td class="py-3 px-3">${statusBadge}</td>
+            <td class="py-3 px-3">${ytLink}</td>
+            <td class="py-3 px-3">${countdownHtml}</td>
+            <td class="py-3 px-3 text-right">${actionBtn}</td>
+          </tr>
+        `;
+      }).join('');
+    }
+
+    function renderStorageHistory(history) {
+      const tbody = document.getElementById('storageHistoryTableBody');
+      const badge = document.getElementById('storageHistoryCountBadge');
+      if (badge) badge.textContent = history.length + ' Records';
+      if (!tbody) return;
+
+      if (!history || history.length === 0) {
+        tbody.innerHTML = `
+          <tr>
+            <td colspan="5" class="py-8 text-center text-text-muted text-xs">
+              No cleanup events recorded yet.
+            </td>
+          </tr>
+        `;
+        return;
+      }
+
+      tbody.innerHTML = history.map(h => {
+        const sizeFormatted = (h.file_size_bytes > 0) ? (h.file_size_bytes / (1024 * 1024)).toFixed(1) + ' MB' : '0 MB';
+        const fileName = (h.file_path || '').split(/[\\/]/).pop();
+        const dateStr = h.deleted_at ? new Date(h.deleted_at).toLocaleString() : '—';
+
+        let statusBadge = '';
+        if (h.status === 'DELETED' || h.status === 'MANUAL_DELETED') {
+          statusBadge = '<span class="font-mono text-[10px] px-2 py-0.5 rounded-full font-bold bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">' + h.status + '</span>';
+        } else if (h.status === 'SKIPPED') {
+          statusBadge = '<span class="font-mono text-[10px] px-2 py-0.5 rounded-full font-bold bg-amber-500/15 text-amber-300 border border-amber-500/30">SKIPPED</span>';
+        } else if (h.status === 'DRY_RUN') {
+          statusBadge = '<span class="font-mono text-[10px] px-2 py-0.5 rounded-full font-bold bg-cyan-500/15 text-cyan-300 border border-cyan-500/30">DRY_RUN</span>';
+        } else {
+          statusBadge = '<span class="font-mono text-[10px] px-2 py-0.5 rounded-full font-bold bg-red-500/15 text-red-300 border border-red-500/30">' + h.status + '</span>';
+        }
+
+        return `
+          <tr class="hover:bg-surface/60 transition-colors">
+            <td class="py-2.5 px-3 font-mono text-[11px] text-text-muted">${dateStr}</td>
+            <td class="py-2.5 px-3 font-mono text-[11px] text-white truncate max-w-xs" title="${h.file_path}">${fileName}</td>
+            <td class="py-2.5 px-3 font-mono text-[11px] text-emerald-400 font-bold">${sizeFormatted}</td>
+            <td class="py-2.5 px-3">${statusBadge}</td>
+            <td class="py-2.5 px-3 text-[11px] text-text-subtle truncate max-w-sm" title="${h.reason}">${h.reason}</td>
+          </tr>
+        `;
+      }).join('');
+    }
+
+    async function saveStorageSettings(e) {
+      if (e) e.preventDefault();
+      const autoEnabled = document.getElementById('storageAutoToggle').checked;
+      const retentionHours = parseInt(document.getElementById('storageRetentionSelect').value, 10);
+      const dryRun = document.getElementById('storageDryRunToggle').checked;
+
+      try {
+        const res = await fetch('/api/production/storage/settings', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            auto_cleanup_enabled: autoEnabled,
+            retention_hours: retentionHours,
+            dry_run: dryRun,
+          }),
+        });
+        if (res.ok) {
+          showToast('Storage cleanup settings updated successfully!');
+          loadStorageManagerData();
+        } else {
+          showToast('Failed to save settings', 'error');
+        }
+      } catch (err) {
+        showToast('Error: ' + err.message, 'error');
+      }
+    }
+
+    async function runManualStorageCleanup() {
+      if (!confirm('Run storage cleanup now?\\n\\nAutoClip will verify YouTube public accessibility for all rendered videos and clean up only eligible files (> retention window). Unpublished/Private/Unlisted files will remain untouched.')) {
+        return;
+      }
+      try {
+        const res = await fetch('/api/production/storage/cleanup-now', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ dry_run: false }),
+        });
+        const data = await res.json();
+        showToast(`Cleanup completed: ${data.deleted_count || 0} deleted, ${data.skipped_count || 0} skipped, ${data.recovered_formatted || '0 MB'} reclaimed`);
+        loadStorageManagerData();
+      } catch (err) {
+        showToast('Cleanup failed: ' + err.message, 'error');
+      }
+    }
+
+    async function manualDeleteStorageItem(itemId, title) {
+      if (!confirm(`Safely delete the local rendered file for:\\n"${title}"?\\n\\nNote: The video must be verified Public on YouTube. Original sources and cloud uploads are safe.`)) {
+        return;
+      }
+      try {
+        const res = await fetch('/api/production/storage/delete-item', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ item_id: itemId }),
+        });
+        const data = await res.json();
+        if (data.deleted_count > 0) {
+          showToast(`Reclaimed disk space for "${title}"!`);
+        } else if (data.skipped_count > 0) {
+          const action = (data.actions && data.actions[0]) || {};
+          showToast(`Skipped: ${action.reason || 'Verification blocked'}`, 'error');
+        } else {
+          showToast('Item could not be deleted', 'error');
+        }
+        loadStorageManagerData();
+      } catch (err) {
+        showToast('Error: ' + err.message, 'error');
+      }
+    }
+
     // Polling interval
     setInterval(() => {
       if (currentBatchId) selectBatch(currentBatchId);
@@ -3419,6 +3966,7 @@
     loadTrendHunterData();
     fetchProductionStatus();
     fetchProductionCalendar();
+    loadStorageManagerData();
 
   </script>
 </body>
