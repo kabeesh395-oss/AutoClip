@@ -115,12 +115,14 @@ class JobQueueItem:
 
 @dataclass
 class TrendHunterConfig:
-    pre_roll_seconds: float = 20.0
-    post_roll_seconds: float = 40.0
-    buffer_retention_seconds: float = 300.0  # 5 minutes ring buffer
+    pre_roll_seconds: float = 30.0
+    post_roll_seconds: float = 45.0
+    min_clip_duration_seconds: float = 45.0
+    max_clip_duration_seconds: float = 90.0  # 1m 30s Shorts limit
+    buffer_retention_seconds: float = 360.0  # 6 minutes ring buffer
     sensitivity: str = "medium"  # 'low' | 'medium' | 'high'
     min_confidence: float = 60.0
-    dedup_window_seconds: float = 60.0
+    dedup_window_seconds: float = 120.0  # Prevent overlapping clip reuse
     layout: str = "FIT_BLUR"  # 'FIT_BLUR' | 'SPLIT_STACK' | 'SMART_CROP'
     caption_style: str = "KINETIC_YELLOW"
     remove_silence: bool = True
