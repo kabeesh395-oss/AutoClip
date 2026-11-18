@@ -14,6 +14,7 @@ from .content_producer import ContentProducer, compute_file_sha256
 from .models import ContentItem, PlatformType, PrivacyStatus, ProductionRules, PublishSchedule, PublishStatus
 from .multi_publisher import MultiPublisherRouter, PublisherError, QuotaExceededError
 from .storage import DEFAULT_DB, ProductionStorage
+from .storage_cleaner import StorageCleanupManager
 
 logger = logging.getLogger("autoclip.production.service")
 
@@ -36,6 +37,7 @@ class ProductionService:
         self.publisher = MultiPublisherRouter(self.storage)
         self.calendar = CalendarManager(self.storage)
         self.analytics = AnalyticsEngine(self.storage)
+        self.storage_cleaner = StorageCleanupManager(self.storage, db_path=self.db_path)
 
         self._worker_thread: threading.Thread | None = None
         self._stop_event = threading.Event()
@@ -61,6 +63,14 @@ class ProductionService:
                 self._process_due_schedules()
             except Exception as exc:
                 logger.error("Error in production scheduler loop: %s", exc)
+
+            try:
+                settings = self.storage_cleaner.get_settings()
+                if settings.auto_cleanup_enabled:
+                    self.storage_cleaner.run_cleanup()
+            except Exception as exc:
+                logger.error("Error in storage cleanup loop: %s", exc)
+
             self._stop_event.wait(30.0)
 
     def _process_due_schedules(self) -> None:

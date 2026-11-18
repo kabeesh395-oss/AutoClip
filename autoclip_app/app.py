@@ -1688,4 +1688,62 @@ def api_production_validate_subtitles(payload: dict = Body(...)):
     return {"valid": is_valid, "errors": errors}
 
 
+# =====================================================================
+# STORAGE MANAGEMENT & AUTOMATIC CLEANUP API
+# =====================================================================
+
+@app.get("/api/production/storage/status")
+def api_production_storage_status():
+    from .production import production_service
+    report = production_service.storage_cleaner.get_storage_report()
+    return report.to_dict()
+
+
+@app.get("/api/production/storage/settings")
+def api_production_storage_settings_get():
+    from .production import production_service
+    settings = production_service.storage_cleaner.get_settings()
+    return settings.to_dict()
+
+
+@app.post("/api/production/storage/settings")
+def api_production_storage_settings_update(payload: dict = Body(...)):
+    from .production import production_service
+    auto_enabled = payload.get("auto_cleanup_enabled")
+    retention_hours = payload.get("retention_hours")
+    dry_run = payload.get("dry_run")
+    settings = production_service.storage_cleaner.update_settings(
+        auto_cleanup_enabled=auto_enabled,
+        retention_hours=retention_hours,
+        dry_run=dry_run,
+    )
+    return {"status": "updated", "settings": settings.to_dict()}
+
+
+@app.post("/api/production/storage/cleanup-now")
+def api_production_storage_cleanup_now(payload: dict = Body(default={})):
+    from .production import production_service
+    dry_run = payload.get("dry_run", False)
+    res = production_service.storage_cleaner.run_cleanup(dry_run=dry_run)
+    return res
+
+
+@app.post("/api/production/storage/delete-item")
+def api_production_storage_delete_item(payload: dict = Body(...)):
+    from .production import production_service
+    item_id = payload.get("item_id")
+    if not item_id:
+        raise HTTPException(status_code=400, detail="Missing item_id")
+    res = production_service.storage_cleaner.run_cleanup(force_item_id=item_id)
+    return res
+
+
+@app.get("/api/production/storage/history")
+def api_production_storage_history(limit: int = 50):
+    from .production import production_service
+    history = production_service.storage_cleaner.list_history(limit=limit)
+    return {"history": [h.to_dict() for h in history]}
+
+
+
 

@@ -23,6 +23,13 @@ from .multi_publisher import (
 )
 from .service import ProductionService
 from .storage import ProductionStorage, init_production_tables
+from .storage_cleaner import (
+    CleanupCandidate,
+    CleanupHistoryItem,
+    StorageCleanupManager,
+    StorageCleanupSettings,
+    StorageUsageReport,
+)
 
 # Global singleton instance for app-wide access
 production_service = ProductionService()
@@ -30,6 +37,8 @@ production_service = ProductionService()
 __all__ = [
     "AnalyticsEngine",
     "CalendarManager",
+    "CleanupCandidate",
+    "CleanupHistoryItem",
     "ContentItem",
     "ContentProducer",
     "DuplicateUploadError",
@@ -46,6 +55,9 @@ __all__ = [
     "PublishStatus",
     "QuotaExceededError",
     "RightsConfirmationRequiredError",
+    "StorageCleanupManager",
+    "StorageCleanupSettings",
+    "StorageUsageReport",
     "SubtitleTimingValidator",
     "YouTubePublisher",
     "compute_file_sha256",
